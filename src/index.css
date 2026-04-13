@@ -1,0 +1,57 @@
+body {
+  margin: 0;
+  font-family: "Inter", Arial, sans-serif;
+  background: #eef2ff;
+  color: #1a1a1a;
+}
+
+:root {
+  --primary: #4f46e5;
+  --green: #16a34a;
+  --red: #dc2626;
+  --gray: #6b7280;
+}
+
+/* TITULOS */
+h1 {
+  font-size: 28px;
+  color: #111;
+}
+
+h2 {
+  margin-bottom: 10px;
+}
+
+/* INPUTS */
+input {
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  font-size: 14px;
+  width: 100%;
+}
+
+input:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+/* BOTÕES */
+button {
+  transition: 0.2s;
+}
+
+button:hover {
+  opacity: 0.9;
+}
+
+/* NAV */
+nav a {
+  text-decoration: none;
+  color: var(--primary);
+  font-weight: 500;
+}
+
+nav a:hover {
+  text-decoration: underline;
+}
