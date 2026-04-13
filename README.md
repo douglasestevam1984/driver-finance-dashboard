@@ -34,8 +34,8 @@ Pensado com base na experiência real de um motorista TVDE.
 
 ## 🔗 Demo
 
-(Colocar aqui o link do Vercel)
+https://vercel.com/douglasestevam1984s-projects/driver-finance-dashboard
 
 ## 📸 Preview
 
-(Adicionar screenshot depois)
+(image.png)

@@ -23,11 +23,11 @@ function AddDay() {
     e.preventDefault();
 
     const newDay = {
-      ...form,
-      ganho: Number(form.ganho),
-      combustivel: Number(form.combustivel),
-      operadorPercent: Number(form.operadorPercent),
-      horas: Number(form.horas),
+      date,
+      ganho: Number(ganho) || 0,
+      combustivel: Number(combustivel) || 0,
+      operadorPercent: Number(operadorPercent) || 0,
+      horas: Number(horas) || 0,
     };
 
     addDay(newDay);
