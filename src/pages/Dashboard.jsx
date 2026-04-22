@@ -1,28 +1,72 @@
-import { useContext } from 'react';
+import { useContext, useState } from 'react';
 import { AppContext } from '../context/AppContext';
 
 function Dashboard() {
   const { days, fixedCosts } = useContext(AppContext);
 
-  const totalGanho = days.reduce((acc, day) => acc + (day.ganho || 0), 0);
+  const [insights, setInsights] = useState('');
+
+  // ===== CÁLCULOS =====
+
+  const totalGanho = days.reduce((acc, d) => acc + (d.ganho || 0), 0);
   const totalCombustivel = days.reduce(
-    (acc, day) => acc + (day.combustivel || 0),
+    (acc, d) => acc + (d.combustivel || 0),
     0,
   );
-  const totalHoras = days.reduce((acc, day) => acc + (day.horas || 0), 0);
+  const totalHoras = days.reduce((acc, d) => acc + (d.horas || 0), 0);
 
-  const totalOperador = days.reduce((acc, day) => {
-    const percent = day.operadorPercent || 0;
-    return acc + (day.ganho || 0) * (percent / 100);
+  const totalOperador = days.reduce((acc, d) => {
+    const percent = d.operadorPercent || 0;
+    return acc + (d.ganho || 0) * (percent / 100);
   }, 0);
 
   const lucroTotal = totalGanho - (totalCombustivel + totalOperador);
   const lucroReal = lucroTotal - (fixedCosts || 0);
-  const mediaHora = totalHoras > 0 ? lucroTotal / totalHoras : 0;
+
+  const mediaHora = totalHoras > 0 ? totalGanho / totalHoras : 0;
+
+  // ===== IA (INSIGHTS) =====
+
+  const gerarInsights = () => {
+    if (days.length === 0) {
+      return 'Sem dados suficientes para análise.';
+    }
+
+    const melhorDia = days.reduce((prev, curr) =>
+      (curr.ganho || 0) > (prev.ganho || 0) ? curr : prev,
+    );
+
+    const piorDia = days.reduce((prev, curr) =>
+      (curr.ganho || 0) < (prev.ganho || 0) ? curr : prev,
+    );
+
+    const mediaGanho = totalGanho / days.length;
+
+    let analise = `📊 Análise Inteligente:\n\n`;
+
+    analise += `• Melhor dia: ${melhorDia.date} (€${melhorDia.ganho})\n`;
+    analise += `• Pior dia: ${piorDia.date} (€${piorDia.ganho})\n`;
+    analise += `• Média diária: €${mediaGanho.toFixed(2)}\n`;
+    analise += `• Média por hora: €${mediaHora.toFixed(2)}\n\n`;
+
+    if (mediaHora < 10) {
+      analise += `⚠️ Sua média por hora está baixa. Pode ser interessante rever horários ou zonas.\n`;
+    } else {
+      analise += `✅ Sua média por hora está em um bom nível.\n`;
+    }
+
+    if (totalCombustivel > totalGanho * 0.3) {
+      analise += `⚠️ O custo com combustível está alto em relação ao ganho.\n`;
+    }
+
+    analise += `\n💡 Dica: Analise seus melhores dias e tente repetir os mesmos horários ou zonas.`;
+
+    return analise;
+  };
 
   return (
     <div>
-      {/* RESUMO */}
+      {/* TÍTULO */}
       <div style={{ marginBottom: '30px' }}>
         <h2>Resumo Financeiro</h2>
         <p style={{ color: '#6b7280' }}>
@@ -50,6 +94,39 @@ function Dashboard() {
         />
         <SmallCard title="⏱ €/Hora" value={`€ ${mediaHora.toFixed(2)}`} />
       </div>
+
+      {/* BOTÃO IA */}
+      <button
+        onClick={() => setInsights(gerarInsights())}
+        style={{
+          marginTop: '30px',
+          padding: '14px',
+          background: '#111',
+          color: '#fff',
+          borderRadius: '10px',
+          border: 'none',
+          cursor: 'pointer',
+          fontWeight: 'bold',
+        }}
+      >
+        🤖 Gerar análise inteligente
+      </button>
+
+      {/* RESULTADO */}
+      {insights && (
+        <div
+          style={{
+            marginTop: '20px',
+            background: '#fff',
+            padding: '20px',
+            borderRadius: '12px',
+            boxShadow: '0 8px 25px rgba(0,0,0,0.05)',
+            whiteSpace: 'pre-line',
+          }}
+        >
+          {insights}
+        </div>
+      )}
     </div>
   );
 }
