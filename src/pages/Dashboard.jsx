@@ -3,7 +3,6 @@ import { AppContext } from '../context/AppContext';
 
 function Dashboard() {
   const { days, fixedCosts } = useContext(AppContext);
-
   const [insights, setInsights] = useState('');
 
   // ===== CÁLCULOS =====
@@ -25,7 +24,7 @@ function Dashboard() {
 
   const mediaHora = totalHoras > 0 ? totalGanho / totalHoras : 0;
 
-  // ===== IA (INSIGHTS) =====
+  // ===== IA =====
 
   const gerarInsights = () => {
     if (days.length === 0) {
@@ -50,29 +49,49 @@ function Dashboard() {
     analise += `• Média por hora: €${mediaHora.toFixed(2)}\n\n`;
 
     if (mediaHora < 10) {
-      analise += `⚠️ Sua média por hora está baixa. Pode ser interessante rever horários ou zonas.\n`;
+      analise += `⚠️ Sua média por hora está baixa. Reveja horários ou zonas.\n`;
     } else {
-      analise += `✅ Sua média por hora está em um bom nível.\n`;
+      analise += `✅ Sua média por hora está em bom nível.\n`;
     }
 
     if (totalCombustivel > totalGanho * 0.3) {
-      analise += `⚠️ O custo com combustível está alto em relação ao ganho.\n`;
+      analise += `⚠️ Custo com combustível elevado.\n`;
     }
 
-    analise += `\n💡 Dica: Analise seus melhores dias e tente repetir os mesmos horários ou zonas.`;
+    if (lucroReal < 0) {
+      analise += `\n🚨 ALERTA: Você está operando no prejuízo. Reduza custos ou ajuste estratégia.\n`;
+    }
+
+    analise += `\n💡 Dica: Foque nos dias mais lucrativos e replique padrões.`;
 
     return analise;
   };
 
   return (
     <div>
-      {/* TÍTULO */}
+      {/* HEADER */}
       <div style={{ marginBottom: '30px' }}>
         <h2>Resumo Financeiro</h2>
         <p style={{ color: '#6b7280' }}>
           Visão geral do seu desempenho como motorista.
         </p>
       </div>
+
+      {/* ALERTA DE PREJUÍZO */}
+      {lucroReal < 0 && (
+        <div
+          style={{
+            marginBottom: '20px',
+            padding: '15px',
+            background: '#fee2e2',
+            color: '#991b1b',
+            borderRadius: '10px',
+            fontWeight: 'bold',
+          }}
+        >
+          🚨 Você está com prejuízo. Revise seus custos imediatamente.
+        </div>
+      )}
 
       {/* GRID */}
       <div
@@ -82,8 +101,8 @@ function Dashboard() {
           gap: '20px',
         }}
       >
-        <BigCard title="Lucro" value={lucroTotal} positive />
-        <BigCard title="Lucro Real" value={lucroReal} positive />
+        <BigCard title="Lucro" value={lucroTotal} />
+        <BigCard title="Lucro Real" value={lucroReal} />
 
         <SmallCard title="📅 Dias" value={days.length} />
         <SmallCard title="💰 Ganho" value={`€ ${totalGanho}`} />
@@ -133,13 +152,15 @@ function Dashboard() {
 
 /* ===== COMPONENTES ===== */
 
-function BigCard({ title, value, positive }) {
+function BigCard({ title, value }) {
+  const isPositive = value >= 0;
+
   return (
     <div
       style={{
-        background: positive
+        background: isPositive
           ? 'linear-gradient(135deg, #16a34a, #22c55e)'
-          : '#dc2626',
+          : 'linear-gradient(135deg, #dc2626, #ef4444)',
         color: '#fff',
         padding: '25px',
         borderRadius: '16px',
