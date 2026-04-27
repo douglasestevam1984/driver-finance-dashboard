@@ -1,75 +1,113 @@
-# 🚗 TVDE Analytics Dashboard
+# 🚗 Driver Finance Dashboard
 
-A data-driven dashboard built to help ride-hailing drivers (Uber/Bolt) track performance, costs, and real profitability.
-
----
-
-## 💡 Problem
-
-Most drivers track earnings manually or not at all.
-
-This project solves:
-
-- Lack of clarity on real profit
-- No visibility on platform performance (Uber vs Bolt)
-- Poor decision-making due to missing data
+A data-driven dashboard built to help ride-hailing drivers (Uber & Bolt) understand their **real profitability** and make better daily decisions.
 
 ---
 
-## 🚀 Features
+## 💡 Why this project exists
 
-- 📊 Weekly profit analysis (based on real payout cycle)
-- 🔄 Dual input system:
-  - Daily summary (fast input)
-  - Ride-by-ride tracking (detailed analysis)
-- ⚖️ Uber vs Bolt comparison
-- 💸 Automatic cost calculation (fuel + operator %)
-- 📈 Smart insights (AI-like analysis)
-- ⏱️ Profit per hour calculation
+As a TVDE driver, I realized something critical:
+
+> Most drivers track earnings… but don’t actually know if they are making money.
+
+This dashboard solves that problem by turning raw daily data into **clear financial insights**.
+
+---
+
+## 🚀 Key Features
+
+### 📊 Weekly Profit Analysis (Real Payout Logic)
+
+- Data grouped by **weekly payout cycle (Monday → Sunday)**
+- Reflects how drivers actually get paid
+- Helps identify profitable vs unprofitable weeks
+
+---
+
+### 🔄 Dual Input System
+
+Supports two real-world workflows:
+
+- **Quick Mode** → total earnings per day
+- **Detailed Mode** → ride-by-ride tracking
+
+---
+
+### ⚖️ Uber vs Bolt Comparison
+
+- Understand which platform performs better
+- Data-driven decision making
+
+---
+
+### 💸 Automatic Cost Calculation
+
+- Fuel costs
+- Operator commission (%)
+- Real net profit (not just earnings)
+
+---
+
+### 📈 Smart Insights
+
+- Profitability analysis
+- Profit per hour
+- Performance feedback based on data
 
 ---
 
 ## 🧠 Key Insight
 
-The dashboard is built around **real driver workflow**:
+This project is built around a real constraint:
 
-> Drivers get paid weekly → analysis is done weekly
+> Drivers don’t think daily — they think weekly (because they get paid weekly).
+
+That’s why the dashboard focuses on **weekly analytics instead of daily metrics**.
 
 ---
 
 ## 🛠️ Tech Stack
 
 - React (Hooks + Context API)
-- Chart.js
+- Chart.js (data visualization)
 - JavaScript (ES6+)
-- CSS (custom styling)
+- CSS (custom UI)
 
 ---
 
 ## 📸 Preview
 
-preview.png
+### Dashboard Overview
+
+previwe.png)
 
 ---
 
 ## 🚀 Live Demo
 
-https://driver-finance-dashboard.vercel.app/
+👉 https://vercel.com/douglasestevam1984s-projects/driver-finance-dashboard
 
 ---
 
-## 🎯 Future Improvements
+## 🎯 What I focused on
 
-- Weekly growth comparison
-- Advanced analytics (best day, best time)
+- Turning a real-world problem into a digital product
+- Building business logic, not just UI
+- Creating a usable tool, not just a demo project
+
+---
+
+## 🔮 Next Steps
+
+- Weekly growth comparison (trend analysis)
+- Best day / best time detection
 - Backend integration (Firebase)
-- Mobile optimization
+- Mobile-first optimization
 
 ---
 
-## 👨‍💻 Author
+## 👨‍💻 About Me
 
-Douglas Estevam  
-Frontend Developer (transitioning from Civil Engineering)
+Frontend Developer transitioning from Civil Engineering, focused on building **real-world, data-driven applications**.
 
 ---
