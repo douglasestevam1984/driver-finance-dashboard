@@ -1,41 +1,75 @@
-# 🚗 Driver Finance Dashboard
+# 🚗 TVDE Analytics Dashboard
 
-Aplicação desenvolvida para ajudar motoristas TVDE (Uber / Bolt) a entender o seu lucro real de forma simples e clara.
+A data-driven dashboard built to help ride-hailing drivers (Uber/Bolt) track performance, costs, and real profitability.
 
-## 💡 Problema
+---
 
-A maioria dos motoristas vê apenas o valor bruto das plataformas, sem considerar:
+## 💡 Problem
 
-- combustível
-- comissão do operador
-- custos fixos mensais
+Most drivers track earnings manually or not at all.
 
-## 🚀 Solução
+This project solves:
 
-Este dashboard permite:
+- Lack of clarity on real profit
+- No visibility on platform performance (Uber vs Bolt)
+- Poor decision-making due to missing data
 
-- Registar ganhos diários
-- Calcular automaticamente:
-  - lucro líquido
-  - custo do operador (%)
-  - €/hora
-  - lucro real (após custos fixos)
+---
 
-## 🧠 Diferencial
+## 🚀 Features
 
-Pensado com base na experiência real de um motorista TVDE.
+- 📊 Weekly profit analysis (based on real payout cycle)
+- 🔄 Dual input system:
+  - Daily summary (fast input)
+  - Ride-by-ride tracking (detailed analysis)
+- ⚖️ Uber vs Bolt comparison
+- 💸 Automatic cost calculation (fuel + operator %)
+- 📈 Smart insights (AI-like analysis)
+- ⏱️ Profit per hour calculation
 
-## 🛠️ Tecnologias
+---
 
-- React
-- Context API
-- JavaScript
-- CSS
+## 🧠 Key Insight
 
-## 🔗 Demo
+The dashboard is built around **real driver workflow**:
 
-https://vercel.com/douglasestevam1984s-projects/driver-finance-dashboard
+> Drivers get paid weekly → analysis is done weekly
+
+---
+
+## 🛠️ Tech Stack
+
+- React (Hooks + Context API)
+- Chart.js
+- JavaScript (ES6+)
+- CSS (custom styling)
+
+---
 
 ## 📸 Preview
 
-(image.png)
+preview.png
+
+---
+
+## 🚀 Live Demo
+
+https://driver-finance-dashboard.vercel.app/
+
+---
+
+## 🎯 Future Improvements
+
+- Weekly growth comparison
+- Advanced analytics (best day, best time)
+- Backend integration (Firebase)
+- Mobile optimization
+
+---
+
+## 👨‍💻 Author
+
+Douglas Estevam  
+Frontend Developer (transitioning from Civil Engineering)
+
+---
