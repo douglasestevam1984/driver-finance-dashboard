@@ -79,7 +79,7 @@ That’s why the dashboard focuses on **weekly analytics instead of daily metric
 
 ### Dashboard Overview
 
-previwe.png)
+![Dashboard Preview](preview.png)
 
 ---
 
