@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-function AddDay({ setDays, setPage }) {
+function AddDay({ onSave, setPage }) {
   const [mode, setMode] = useState('total');
 
   const [form, setForm] = useState({
@@ -49,7 +49,7 @@ function AddDay({ setDays, setPage }) {
       mode,
     };
 
-    setDays((prev) => [...prev, newDay]);
+    onSave(newDay);
 
     setForm({
       date: '',

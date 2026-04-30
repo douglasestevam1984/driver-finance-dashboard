@@ -79,13 +79,13 @@ That’s why the dashboard focuses on **weekly analytics instead of daily metric
 
 ### Dashboard Overview
 
-previwe.png)
+![Dashboard Overview](preview.png)
 
 ---
 
 ## 🚀 Live Demo
 
-👉 https://vercel.com/douglasestevam1984s-projects/driver-finance-dashboard
+👉 https://driver-finance-dashboard.vercel.app
 
 ---
 

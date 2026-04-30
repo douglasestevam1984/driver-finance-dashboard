@@ -2,23 +2,56 @@ import { useEffect, useState } from 'react';
 import Dashboard from './pages/Dashboard';
 import AddDay from './pages/AddDay';
 import History from './pages/History';
+import { demoData } from './data/demoData';
 
 function App() {
   const [page, setPage] = useState('dashboard');
+  const [isDemo, setIsDemo] = useState(false);
 
   const [days, setDays] = useState(() => {
     const saved = localStorage.getItem('driver-days');
-    return saved ? JSON.parse(saved) : [];
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed.length > 0) return parsed;
+    }
+    // Sem dados guardados → carrega demo
+    setIsDemo(true); // nota: chamada dentro do initializer, será ignorada pelo React
+    return demoData;
   });
 
+  // Detecta se está em modo demo após montagem
   useEffect(() => {
-    localStorage.setItem('driver-days', JSON.stringify(days));
-  }, [days]);
+    const saved = localStorage.getItem('driver-days');
+    const parsed = saved ? JSON.parse(saved) : [];
+    if (parsed.length === 0) {
+      setIsDemo(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    // Não persiste dados de demo no localStorage
+    if (!isDemo) {
+      localStorage.setItem('driver-days', JSON.stringify(days));
+    }
+  }, [days, isDemo]);
+
+  function handleAddDay(newDay) {
+    // Primeiro registo real: descarta os dados de demo
+    if (isDemo) {
+      setIsDemo(false);
+      setDays([newDay]);
+      localStorage.setItem('driver-days', JSON.stringify([newDay]));
+    } else {
+      setDays((prev) => [...prev, newDay]);
+    }
+  }
 
   function renderPage() {
-    if (page === 'add') return <AddDay setDays={setDays} setPage={setPage} />;
-    if (page === 'history') return <History days={days} setDays={setDays} />;
-    return <Dashboard days={days} />;
+    if (page === 'add')
+      return <AddDay onSave={handleAddDay} setPage={setPage} />;
+    if (page === 'history')
+      return <History days={days} setDays={setDays} isDemo={isDemo} />;
+    return <Dashboard days={days} isDemo={isDemo} />;
   }
 
   return (
@@ -28,6 +61,13 @@ function App() {
           <h1 style={styles.logo}>🚗 DriveOS</h1>
           <p style={styles.logoSub}>Finance Dashboard</p>
         </div>
+
+        {isDemo && (
+          <div style={styles.demoBadge}>
+            <span style={styles.demoDot} />
+            Modo Demo
+          </div>
+        )}
 
         <nav style={styles.nav}>
           <button
@@ -89,9 +129,30 @@ const styles = {
     fontWeight: 900,
   },
   logoSub: {
-    margin: '6px 0 34px',
+    margin: '6px 0 16px',
     color: '#64748b',
     fontWeight: 600,
+  },
+  demoBadge: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    marginBottom: '18px',
+    padding: '8px 12px',
+    borderRadius: '10px',
+    background: '#fef9c3',
+    color: '#854d0e',
+    fontSize: '12px',
+    fontWeight: 800,
+    letterSpacing: '0.05em',
+  },
+  demoDot: {
+    display: 'inline-block',
+    width: '8px',
+    height: '8px',
+    borderRadius: '50%',
+    background: '#eab308',
+    flexShrink: 0,
   },
   nav: {
     display: 'flex',
