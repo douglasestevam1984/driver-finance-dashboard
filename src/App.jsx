@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import Dashboard from './pages/Dashboard';
 import AddDay from './pages/AddDay';
 import History from './pages/History';
@@ -19,10 +20,11 @@ function useIsMobile() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function App() {
-  const [page, setPage] = useState('dashboard');
   const [isDemo, setIsDemo] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const isMobile = useIsMobile();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const [days, setDays] = useState(() => {
     const saved = localStorage.getItem('driver-days');
@@ -45,8 +47,8 @@ function App() {
     }
   }, [days, isDemo]);
 
-  function navigate(p) {
-    setPage(p);
+  function goTo(path) {
+    navigate(path);
     setMenuOpen(false);
   }
 
@@ -58,21 +60,24 @@ function App() {
     } else {
       setDays((prev) => [...prev, newDay]);
     }
-  }
-
-  function renderPage() {
-    if (page === 'add')
-      return <AddDay onSave={handleAddDay} setPage={navigate} />;
-    if (page === 'history')
-      return <History days={days} setDays={setDays} isDemo={isDemo} />;
-    return <Dashboard days={days} isDemo={isDemo} />;
+    navigate('/');
   }
 
   const navItems = [
-    { label: '📊 Dashboard', value: 'dashboard' },
-    { label: '➕ Adicionar Dia', value: 'add' },
-    { label: '📋 Histórico', value: 'history' },
+    { label: '📊 Dashboard', path: '/' },
+    { label: '➕ Adicionar Dia', path: '/add' },
+    { label: '📋 Histórico', path: '/history' },
   ];
+
+  const currentPath = location.pathname;
+
+  const pageContent = (
+    <Routes>
+      <Route path="/" element={<Dashboard days={days} isDemo={isDemo} />} />
+      <Route path="/add" element={<AddDay onSave={handleAddDay} />} />
+      <Route path="/history" element={<History days={days} setDays={setDays} isDemo={isDemo} />} />
+    </Routes>
+  );
 
   // ── MOBILE LAYOUT ──────────────────────────────────────────────────────────
   if (isMobile) {
@@ -101,12 +106,12 @@ function App() {
               <p style={mobile.drawerTitle}>Navegação</p>
               {navItems.map((item) => (
                 <button
-                  key={item.value}
+                  key={item.path}
                   style={{
                     ...mobile.drawerItem,
-                    ...(page === item.value ? mobile.drawerActive : {}),
+                    ...(currentPath === item.path ? mobile.drawerActive : {}),
                   }}
-                  onClick={() => navigate(item.value)}
+                  onClick={() => goTo(item.path)}
                 >
                   {item.label}
                 </button>
@@ -116,18 +121,18 @@ function App() {
         )}
 
         {/* Page content */}
-        <main style={mobile.main}>{renderPage()}</main>
+        <main style={mobile.main}>{pageContent}</main>
 
         {/* Bottom navigation */}
         <nav style={mobile.bottomNav}>
           {navItems.map((item) => (
             <button
-              key={item.value}
+              key={item.path}
               style={{
                 ...mobile.bottomItem,
-                ...(page === item.value ? mobile.bottomActive : {}),
+                ...(currentPath === item.path ? mobile.bottomActive : {}),
               }}
-              onClick={() => navigate(item.value)}
+              onClick={() => goTo(item.path)}
             >
               <span style={mobile.bottomIcon}>{item.label.split(' ')[0]}</span>
               <span style={mobile.bottomLabel}>
@@ -159,12 +164,12 @@ function App() {
         <nav style={desktop.nav}>
           {navItems.map((item) => (
             <button
-              key={item.value}
+              key={item.path}
               style={{
                 ...desktop.navItem,
-                ...(page === item.value ? desktop.navActive : {}),
+                ...(currentPath === item.path ? desktop.navActive : {}),
               }}
-              onClick={() => navigate(item.value)}
+              onClick={() => goTo(item.path)}
             >
               {item.label}
             </button>
@@ -172,7 +177,7 @@ function App() {
         </nav>
       </aside>
 
-      <main style={desktop.main}>{renderPage()}</main>
+      <main style={desktop.main}>{pageContent}</main>
     </div>
   );
 }
@@ -199,10 +204,7 @@ const mobile = {
     top: 0,
     zIndex: 100,
   },
-  logo: {
-    fontSize: '20px',
-    fontWeight: 900,
-  },
+  logo: { fontSize: '20px', fontWeight: 900 },
   demoPill: {
     fontSize: '11px',
     fontWeight: 800,
@@ -293,18 +295,9 @@ const mobile = {
     cursor: 'pointer',
     color: '#94a3b8',
   },
-  bottomActive: {
-    color: '#4f46e5',
-  },
-  bottomIcon: {
-    fontSize: '20px',
-    lineHeight: 1,
-  },
-  bottomLabel: {
-    fontSize: '10px',
-    fontWeight: 800,
-    letterSpacing: '0.02em',
-  },
+  bottomActive: { color: '#4f46e5' },
+  bottomIcon: { fontSize: '20px', lineHeight: 1 },
+  bottomLabel: { fontSize: '10px', fontWeight: 800, letterSpacing: '0.02em' },
 };
 
 // ── Desktop styles ────────────────────────────────────────────────────────────
@@ -314,8 +307,7 @@ const desktop = {
     minHeight: '100vh',
     background: '#f4f7fb',
     color: '#0f172a',
-    fontFamily:
-      'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   sidebar: {
     width: '260px',
@@ -325,16 +317,8 @@ const desktop = {
     boxShadow: '8px 0 30px rgba(15,23,42,0.04)',
     flexShrink: 0,
   },
-  logo: {
-    margin: 0,
-    fontSize: '28px',
-    fontWeight: 900,
-  },
-  logoSub: {
-    margin: '6px 0 16px',
-    color: '#64748b',
-    fontWeight: 600,
-  },
+  logo: { margin: 0, fontSize: '28px', fontWeight: 900 },
+  logoSub: { margin: '6px 0 16px', color: '#64748b', fontWeight: 600 },
   demoBadge: {
     display: 'flex',
     alignItems: 'center',
@@ -356,11 +340,7 @@ const desktop = {
     background: '#eab308',
     flexShrink: 0,
   },
-  nav: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '12px',
-  },
+  nav: { display: 'flex', flexDirection: 'column', gap: '12px' },
   navItem: {
     padding: '14px 16px',
     borderRadius: '16px',
@@ -377,11 +357,7 @@ const desktop = {
     color: '#ffffff',
     boxShadow: '0 14px 30px rgba(79,70,229,0.28)',
   },
-  main: {
-    flex: 1,
-    padding: '36px',
-    overflowX: 'hidden',
-  },
+  main: { flex: 1, padding: '36px', overflowX: 'hidden' },
 };
 
 export default App;
