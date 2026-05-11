@@ -8,7 +8,7 @@ A data-driven dashboard built to help ride-hailing drivers (Uber & Bolt) underst
 
 As a TVDE driver, I realized something critical:
 
-> Most drivers track earnings… but don’t actually know if they are making money.
+> Most drivers track earnings… but don't actually know if they are making money.
 
 This dashboard solves that problem by turning raw daily data into **clear financial insights**.
 
@@ -60,18 +60,20 @@ Supports two real-world workflows:
 
 This project is built around a real constraint:
 
-> Drivers don’t think daily — they think weekly (because they get paid weekly).
+> Drivers don't think daily — they think weekly (because they get paid weekly).
 
-That’s why the dashboard focuses on **weekly analytics instead of daily metrics**.
+That's why the dashboard focuses on **weekly analytics instead of daily metrics**.
 
 ---
 
 ## 🛠️ Tech Stack
 
 - React (Hooks + Context API)
+- React Router v6 (client-side routing)
 - Chart.js (data visualization)
 - JavaScript (ES6+)
 - CSS (custom UI)
+- Demo data preloaded for first-time visitors
 
 ---
 
@@ -94,20 +96,19 @@ That’s why the dashboard focuses on **weekly analytics instead of daily metric
 - Turning a real-world problem into a digital product
 - Building business logic, not just UI
 - Creating a usable tool, not just a demo project
+- Mobile-first responsive layout with bottom navigation
 
 ---
 
 ## 🔮 Next Steps
 
-- Weekly growth comparison (trend analysis)
-- Best day / best time detection
+- TypeScript migration
+- Unit tests (Vitest)
 - Backend integration (Firebase)
-- Mobile-first optimization
+- Best day / best time detection
 
 ---
 
 ## 👨‍💻 About Me
 
 Frontend Developer transitioning from Civil Engineering, focused on building **real-world, data-driven applications**.
-
----
