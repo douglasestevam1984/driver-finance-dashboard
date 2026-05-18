@@ -24,6 +24,16 @@ This dashboard solves that problem by turning raw daily data into **clear financ
 
 ---
 
+### 💰 Fixed Cost Control & Break-Even Analysis
+
+- Track all fixed costs: car lease, insurance, IUC, maintenance, washing, food, taxes
+- Operator commission (%) configured once — applied automatically to every day
+- Fuel tracked per day — summed automatically, no double entry
+- Real-time weekly break-even analysis: are you covering your costs this week?
+- Smart recommendations: how many more hours or days you need to break even
+
+---
+
 ### 🔄 Dual Input System
 
 Supports two real-world workflows:
@@ -42,8 +52,8 @@ Supports two real-world workflows:
 
 ### 💸 Automatic Cost Calculation
 
-- Fuel costs
-- Operator commission (%)
+- Fuel costs tracked per day
+- Operator commission applied globally
 - Real net profit (not just earnings)
 
 ---
@@ -52,7 +62,8 @@ Supports two real-world workflows:
 
 - Profitability analysis
 - Profit per hour
-- Performance feedback based on data
+- Weekly trend with week-over-week delta
+- Break-even status with actionable recommendations
 
 ---
 
@@ -62,7 +73,7 @@ This project is built around a real constraint:
 
 > Drivers don't think daily — they think weekly (because they get paid weekly).
 
-That's why the dashboard focuses on **weekly analytics instead of daily metrics**.
+That's why the dashboard focuses on **weekly analytics instead of daily metrics** — and shows whether fixed costs are being covered each week.
 
 ---
 
@@ -97,6 +108,7 @@ That's why the dashboard focuses on **weekly analytics instead of daily metrics*
 - Building business logic, not just UI
 - Creating a usable tool, not just a demo project
 - Mobile-first responsive layout with bottom navigation
+- No double data entry — fuel and operator costs flow automatically
 
 ---
 
@@ -112,3 +124,5 @@ That's why the dashboard focuses on **weekly analytics instead of daily metrics*
 ## 👨‍💻 About Me
 
 Frontend Developer transitioning from Civil Engineering, focused on building **real-world, data-driven applications**.
+
+---
