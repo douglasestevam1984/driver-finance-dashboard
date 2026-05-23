@@ -1,13 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, CSSProperties } from 'react';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import Dashboard from './pages/Dashboard';
 import AddDay from './pages/AddDay';
 import History from './pages/History';
 import Costs from './pages/Costs';
 import { demoData } from './data/demoData';
+import { Day } from './types';
 
 // ── Hook: detecta mobile ──────────────────────────────────────────────────────
-function useIsMobile() {
+function useIsMobile(): boolean {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   useEffect(() => {
     const handler = () => setIsMobile(window.innerWidth < 768);
@@ -17,6 +18,12 @@ function useIsMobile() {
   return isMobile;
 }
 
+// ── Tipo para nav items ───────────────────────────────────────────────────────
+interface NavItem {
+  label: string;
+  path: string;
+}
+
 function App() {
   const [isDemo, setIsDemo] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -24,10 +31,10 @@ function App() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [days, setDays] = useState(() => {
+  const [days, setDays] = useState<Day[]>(() => {
     const saved = localStorage.getItem('driver-days');
     if (saved) {
-      const parsed = JSON.parse(saved);
+      const parsed = JSON.parse(saved) as Day[];
       if (parsed.length > 0) return parsed;
     }
     return demoData;
@@ -35,7 +42,7 @@ function App() {
 
   useEffect(() => {
     const saved = localStorage.getItem('driver-days');
-    const parsed = saved ? JSON.parse(saved) : [];
+    const parsed = saved ? (JSON.parse(saved) as Day[]) : [];
     if (parsed.length === 0) setIsDemo(true);
   }, []);
 
@@ -45,12 +52,12 @@ function App() {
     }
   }, [days, isDemo]);
 
-  function goTo(path) {
+  function goTo(path: string): void {
     navigate(path);
     setMenuOpen(false);
   }
 
-  function handleAddDay(newDay) {
+  function handleAddDay(newDay: Day): void {
     if (isDemo) {
       setIsDemo(false);
       setDays([newDay]);
@@ -61,7 +68,7 @@ function App() {
     navigate('/');
   }
 
-  const navItems = [
+  const navItems: NavItem[] = [
     { label: '📊 Dashboard', path: '/' },
     { label: '➕ Adicionar Dia', path: '/add' },
     { label: '📋 Histórico', path: '/history' },
@@ -120,7 +127,6 @@ function App() {
 
         <main style={mobile.main}>{pageContent}</main>
 
-        {/* Bottom nav — apenas 4 itens */}
         <nav style={mobile.bottomNav}>
           {navItems.map((item) => (
             <button
@@ -179,8 +185,11 @@ function App() {
   );
 }
 
+// ── Tipos de estilos ──────────────────────────────────────────────────────────
+type Styles = Record<string, CSSProperties>;
+
 // ── Mobile styles ─────────────────────────────────────────────────────────────
-const mobile = {
+const mobile: Styles = {
   root: { display: 'flex', flexDirection: 'column', minHeight: '100vh', background: '#f4f7fb', fontFamily: 'Inter, system-ui, -apple-system, sans-serif', color: '#0f172a' },
   topBar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', background: '#ffffff', borderBottom: '1px solid #e5e7eb', boxShadow: '0 2px 12px rgba(15,23,42,0.06)', position: 'sticky', top: 0, zIndex: 100 },
   logo: { fontSize: '20px', fontWeight: 900 },
@@ -200,7 +209,7 @@ const mobile = {
 };
 
 // ── Desktop styles ────────────────────────────────────────────────────────────
-const desktop = {
+const desktop: Styles = {
   app: { display: 'flex', minHeight: '100vh', background: '#f4f7fb', color: '#0f172a', fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
   sidebar: { width: '260px', padding: '32px 22px', background: '#ffffff', borderRight: '1px solid #e5e7eb', boxShadow: '8px 0 30px rgba(15,23,42,0.04)', flexShrink: 0 },
   logo: { margin: 0, fontSize: '28px', fontWeight: 900 },
