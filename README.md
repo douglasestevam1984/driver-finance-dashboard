@@ -79,10 +79,10 @@ That's why the dashboard focuses on **weekly analytics instead of daily metrics*
 
 ## 🛠️ Tech Stack
 
+- TypeScript
 - React (Hooks + Context API)
 - React Router v6 (client-side routing)
 - Chart.js (data visualization)
-- JavaScript (ES6+)
 - CSS (custom UI)
 - Demo data preloaded for first-time visitors
 
@@ -109,12 +109,12 @@ That's why the dashboard focuses on **weekly analytics instead of daily metrics*
 - Creating a usable tool, not just a demo project
 - Mobile-first responsive layout with bottom navigation
 - No double data entry — fuel and operator costs flow automatically
+- Full TypeScript migration with typed interfaces and strict mode
 
 ---
 
 ## 🔮 Next Steps
 
-- TypeScript migration
 - Unit tests (Vitest)
 - Backend integration (Firebase)
 - Best day / best time detection
