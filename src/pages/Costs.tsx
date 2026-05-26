@@ -1,7 +1,35 @@
-import { useContext, useState, useEffect } from 'react';
+import { useContext, useState, useEffect, CSSProperties, ChangeEvent } from 'react';
 import { AppContext, calcularCustoSemanal, calcularCustosVariaveisDias } from '../context/AppContext';
+import { Day, Costs as CostsType } from '../types';
 
-function useIsMobile() {
+// ── Tipos ─────────────────────────────────────────────────────────────────────
+type AnalyseTipo = 'positivo' | 'neutro' | 'negativo' | 'info';
+type Styles = Record<string, CSSProperties>;
+
+interface Analise {
+  tipo: AnalyseTipo;
+  emoji: string;
+  texto: string;
+}
+
+interface Campo {
+  key: keyof CostsType;
+  label: string;
+  periodo: string;
+  isPercent?: boolean;
+}
+
+interface Categoria {
+  titulo: string;
+  campos: Campo[];
+}
+
+interface AnaliseColors {
+  [key: string]: CSSProperties;
+}
+
+// ── Hook ──────────────────────────────────────────────────────────────────────
+function useIsMobile(): boolean {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   useEffect(() => {
     const handler = () => setIsMobile(window.innerWidth < 768);
@@ -11,7 +39,7 @@ function useIsMobile() {
   return isMobile;
 }
 
-function getSemanaActual(days) {
+function getSemanaActual(days: Day[]): Day[] {
   const hoje = new Date();
   const diaSemana = hoje.getDay();
   const diffSegunda = diaSemana === 0 ? -6 : 1 - diaSemana;
@@ -27,7 +55,8 @@ function getSemanaActual(days) {
   });
 }
 
-const categorias = [
+// ── Categorias ────────────────────────────────────────────────────────────────
+const categorias: Categoria[] = [
   {
     titulo: '🚗 Viatura',
     campos: [
@@ -67,19 +96,17 @@ const categorias = [
   },
 ];
 
+// ── Componente ────────────────────────────────────────────────────────────────
 export default function Costs() {
   const { costs, updateCosts, days } = useContext(AppContext);
-  const [form, setForm] = useState(costs);
+  const [form, setForm] = useState<CostsType>(costs);
   const [saved, setSaved] = useState(false);
   const isMobile = useIsMobile();
 
   const custoFixoSemanal = calcularCustoSemanal(form);
-
-  // Custos variáveis da semana actual (combustivel + operador dos dias reais)
   const diasSemana = getSemanaActual(days);
   const custosVariaveis = calcularCustosVariaveisDias(diasSemana);
 
-  // Lucro da semana actual
   const lucroSemana = diasSemana.reduce((acc, day) => {
     let ganho = 0;
     if (Array.isArray(day.rides) && day.rides.length > 0) {
@@ -93,21 +120,21 @@ export default function Costs() {
   }, 0);
 
   const custoTotalSemanal = custoFixoSemanal + custosVariaveis.combustivel + custosVariaveis.operador;
-  const margem = diasSemana.length > 0 ? lucroSemana - custoTotalSemanal : null;
+  const margem: number | null = diasSemana.length > 0 ? lucroSemana - custoTotalSemanal : null;
   const temDadosSemana = diasSemana.length > 0;
 
-  function handleChange(key, value) {
+  function handleChange(key: keyof CostsType, value: string): void {
     setForm((prev) => ({ ...prev, [key]: value }));
     setSaved(false);
   }
 
-  function handleSave() {
+  function handleSave(): void {
     updateCosts(form);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }
 
-  function gerarAnalise() {
+  function gerarAnalise(): Analise | null {
     if (custoFixoSemanal === 0 && custosVariaveis.combustivel === 0) return null;
 
     if (!temDadosSemana) {
@@ -120,13 +147,13 @@ export default function Costs() {
 
     const percentagem = custoTotalSemanal > 0 ? (lucroSemana / custoTotalSemanal) * 100 : 0;
 
-    if (margem >= 0 && percentagem >= 130) {
+    if (margem !== null && margem >= 0 && percentagem >= 130) {
       return {
         tipo: 'positivo',
         emoji: '✅',
         texto: `Excelente semana. Margem real de €${margem.toFixed(2)} acima de todos os custos (${Math.round(percentagem)}% cobertos).`,
       };
-    } else if (margem >= 0) {
+    } else if (margem !== null && margem >= 0) {
       return {
         tipo: 'neutro',
         emoji: '⚠️',
@@ -136,7 +163,7 @@ export default function Costs() {
       return {
         tipo: 'negativo',
         emoji: '🚨',
-        texto: `Faltam €${Math.abs(margem).toFixed(2)} para cobrir todos os custos desta semana. Lucro: €${lucroSemana.toFixed(2)} · Total custos: €${custoTotalSemanal.toFixed(2)}`,
+        texto: `Faltam €${Math.abs(margem ?? 0).toFixed(2)} para cobrir todos os custos desta semana. Lucro: €${lucroSemana.toFixed(2)} · Total custos: €${custoTotalSemanal.toFixed(2)}`,
       };
     }
   }
@@ -158,7 +185,6 @@ export default function Costs() {
         </div>
       </header>
 
-      {/* Resumo semanal completo */}
       {(custoFixoSemanal > 0 || temDadosSemana) && (
         <section style={s.summaryGrid}>
           <div style={s.summaryCard}>
@@ -194,7 +220,6 @@ export default function Costs() {
         </section>
       )}
 
-      {/* Análise */}
       {analise && (
         <section style={{ ...s.analiseBox, ...analiseColors[analise.tipo] }}>
           <p style={s.analiseEmoji}>{analise.emoji} Análise Semanal</p>
@@ -202,7 +227,6 @@ export default function Costs() {
         </section>
       )}
 
-      {/* Formulário por categorias */}
       {categorias.map((cat) => (
         <section key={cat.titulo} style={s.card}>
           <h2 style={s.catTitulo}>{cat.titulo}</h2>
@@ -220,8 +244,8 @@ export default function Costs() {
                     min="0"
                     max={campo.isPercent ? '100' : undefined}
                     step={campo.isPercent ? '0.1' : '0.01'}
-                    value={form[campo.key] || ''}
-                    onChange={(e) => handleChange(campo.key, e.target.value)}
+                    value={String(form[campo.key] ?? '')}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange(campo.key, e.target.value)}
                     style={s.input}
                     placeholder={campo.isPercent ? '0' : '0.00'}
                   />
@@ -229,8 +253,6 @@ export default function Costs() {
               </label>
             ))}
           </div>
-
-          {/* Nota explicativa para o operador */}
           {cat.titulo.includes('Operador') && (
             <p style={s.nota}>
               💡 Esta percentagem é aplicada automaticamente a cada dia que adicionares. O valor semanal real aparece no resumo acima.
@@ -239,7 +261,6 @@ export default function Costs() {
         </section>
       ))}
 
-      {/* Nota sobre combustível */}
       <div style={s.notaBox}>
         <p style={s.notaTexto}>
           ⛽ O <strong>combustível</strong> é registado por dia em "Adicionar Dia" e somado automaticamente aqui. Não precisas de o inserir duas vezes.
@@ -253,14 +274,16 @@ export default function Costs() {
   );
 }
 
-const analiseColors = {
+// ── Cores da análise ──────────────────────────────────────────────────────────
+const analiseColors: AnaliseColors = {
   positivo: { background: '#f0fdf4', borderColor: '#86efac' },
   neutro: { background: '#fefce8', borderColor: '#fde047' },
   negativo: { background: '#fef2f2', borderColor: '#fca5a5' },
   info: { background: '#eef2ff', borderColor: '#c7d2fe' },
 };
 
-const desktopStyles = {
+// ── Estilos ───────────────────────────────────────────────────────────────────
+const desktopStyles: Styles = {
   header: { marginBottom: '24px' },
   eyebrow: { margin: 0, fontSize: '12px', fontWeight: 900, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#6366f1' },
   title: { margin: '8px 0', fontSize: '42px', fontWeight: 900, letterSpacing: '-0.04em' },
@@ -288,7 +311,7 @@ const desktopStyles = {
   saveButton: { width: '100%', padding: '16px', borderRadius: '16px', border: 'none', background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', color: '#ffffff', fontSize: '16px', fontWeight: 900, cursor: 'pointer', boxShadow: '0 16px 34px rgba(79,70,229,0.25)', marginTop: '8px' },
 };
 
-const mobileStyles = {
+const mobileStyles: Styles = {
   ...desktopStyles,
   title: { margin: '4px 0 0', fontSize: '26px', fontWeight: 900 },
   summaryGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' },

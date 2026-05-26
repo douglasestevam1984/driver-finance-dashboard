@@ -1,4 +1,4 @@
-import { useContext, useEffect, useMemo, useState } from 'react';
+import { useContext, useEffect, useMemo, useState, CSSProperties } from 'react';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -12,13 +12,83 @@ import {
 } from 'chart.js';
 import { Bar, Line } from 'react-chartjs-2';
 import { AppContext, calcularCustoSemanal } from '../context/AppContext';
+import { Day } from '../types';
 
 ChartJS.register(
   CategoryScale, LinearScale, BarElement,
   LineElement, PointElement, Tooltip, Legend, Filler,
 );
 
-function useIsMobile() {
+// ── Tipos ─────────────────────────────────────────────────────────────────────
+interface DashboardProps {
+  days: Day[];
+  isDemo?: boolean;
+}
+
+interface KpiCardProps {
+  title: string;
+  value: number;
+  color: string;
+  suffix?: string;
+  featured?: boolean;
+  isMobile: boolean;
+}
+
+interface MiniCardProps {
+  title: string;
+  value: number;
+  color: string;
+  isMobile: boolean;
+}
+
+interface DayCalc {
+  ganho: number;
+  uber: number;
+  bolt: number;
+  combustivel: number;
+  operador: number;
+  despesas: number;
+  lucro: number;
+  horas: number;
+}
+
+interface DayCalcSimple {
+  ganho: number;
+  lucro: number;
+  horas: number;
+}
+
+interface WeekData {
+  label: string;
+  labelFull: string;
+  ganho: number;
+  lucro: number;
+  despesas: number;
+  uber: number;
+  bolt: number;
+  dias: number;
+}
+
+interface WeekAccumulator {
+  [key: string]: Omit<WeekData, 'label' | 'labelFull'>;
+}
+
+interface BreakEvenAnalysis {
+  tipo: 'positivo' | 'negativo' | 'info';
+  linhas: string[];
+}
+
+interface BreakEvenColors {
+  positivo: CSSProperties;
+  negativo: CSSProperties;
+  info: CSSProperties;
+}
+
+type Period = '7d' | '30d' | 'all';
+type Styles = Record<string, CSSProperties>;
+
+// ── Hooks ─────────────────────────────────────────────────────────────────────
+function useIsMobile(): boolean {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   useEffect(() => {
     const handler = () => setIsMobile(window.innerWidth < 768);
@@ -28,8 +98,8 @@ function useIsMobile() {
   return isMobile;
 }
 
-// ── Calcula dados da semana actual ────────────────────────────────────────────
-function getSemanaActual(days) {
+// ── Funções utilitárias ───────────────────────────────────────────────────────
+function getSemanaActual(days: Day[]): Day[] {
   const hoje = new Date();
   const diaSemana = hoje.getDay();
   const diffSegunda = diaSemana === 0 ? -6 : 1 - diaSemana;
@@ -39,14 +109,13 @@ function getSemanaActual(days) {
   const domingo = new Date(segunda);
   domingo.setDate(segunda.getDate() + 6);
   domingo.setHours(23, 59, 59, 999);
-
   return days.filter((d) => {
     const date = new Date(d.date);
     return date >= segunda && date <= domingo;
   });
 }
 
-function calcularDia(day) {
+function calcularDia(day: Day): DayCalcSimple {
   let ganho = 0;
   if (Array.isArray(day.rides) && day.rides.length > 0) {
     ganho = day.rides.reduce((s, r) => s + (Number(r.valor) || 0), 0);
@@ -60,16 +129,58 @@ function calcularDia(day) {
   return { ganho, lucro, horas };
 }
 
-function Dashboard({ days, isDemo }) {
+function calcular(day: Day): DayCalc {
+  let ganho = 0, uber = 0, bolt = 0;
+  if (Array.isArray(day.rides) && day.rides.length > 0) {
+    day.rides.forEach((ride) => {
+      const valor = Number(ride.valor) || 0;
+      ganho += valor;
+      if (ride.plataforma === 'uber') uber += valor;
+      if (ride.plataforma === 'bolt') bolt += valor;
+    });
+  } else {
+    ganho = Number(day.ganho) || 0;
+    uber = Number(day.uberTotal) || 0;
+    bolt = Number(day.boltTotal) || 0;
+  }
+  const combustivel = Number(day.combustivel) || 0;
+  const operador = ganho * ((Number(day.operadorPercent) || 0) / 100);
+  const despesas = combustivel + operador;
+  const lucro = ganho - despesas;
+  return { ganho, uber, bolt, combustivel, operador, despesas, lucro, horas: Number(day.horas) || 0 };
+}
+
+// ── Componentes auxiliares ────────────────────────────────────────────────────
+function KpiCard({ title, value, color, suffix = '', featured, isMobile }: KpiCardProps) {
+  const s = isMobile ? mobileStyles : desktopStyles;
+  return (
+    <article style={{ ...s.kpiCard, ...(featured ? s.kpiFeatured : {}) }}>
+      <p style={s.cardLabel}>{title}</p>
+      <h2 style={{ ...s.kpiValue, color }}>€ {Number(value).toFixed(2)}{suffix}</h2>
+    </article>
+  );
+}
+
+function MiniCard({ title, value, color, isMobile }: MiniCardProps) {
+  const s = isMobile ? mobileStyles : desktopStyles;
+  return (
+    <article style={s.miniCard}>
+      <p style={s.cardLabel}>{title}</p>
+      <h3 style={{ ...s.miniValue, color }}>€ {Number(value).toFixed(2)}</h3>
+    </article>
+  );
+}
+
+// ── Dashboard principal ───────────────────────────────────────────────────────
+function Dashboard({ days, isDemo }: DashboardProps) {
   const { costs } = useContext(AppContext);
-  const [period, setPeriod] = useState('all');
-  const [insight, setInsight] = useState('');
+  const [period, setPeriod] = useState<Period>('all');
+  const [insight, setInsight] = useState<string>('');
   const isMobile = useIsMobile();
 
   const custoSemanal = calcularCustoSemanal(costs);
-
-  // Dados da semana actual
   const diasSemanaActual = useMemo(() => getSemanaActual(days), [days]);
+
   const semanaActual = useMemo(() => {
     return diasSemanaActual.reduce(
       (acc, day) => {
@@ -88,8 +199,7 @@ function Dashboard({ days, isDemo }) {
   const temDadosSemana = diasSemanaActual.length > 0;
   const mediaHoraSemana = semanaActual.horas > 0 ? semanaActual.lucro / semanaActual.horas : 0;
 
-  // Análise semanal automática
-  function gerarAnaliseBreakEven() {
+  function gerarAnaliseBreakEven(): BreakEvenAnalysis | null {
     if (!temCustos) return null;
     if (!temDadosSemana) {
       return {
@@ -101,9 +211,9 @@ function Dashboard({ days, isDemo }) {
       };
     }
 
-    const hojeIndex = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1; // 0=Seg, 6=Dom
+    const hojeIndex = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1;
     const diasRestantes = 6 - hojeIndex;
-    const linhas = [];
+    const linhas: string[] = [];
 
     if (margem >= 0) {
       const percentagem = Math.round((semanaActual.lucro / custoSemanal) * 100);
@@ -120,28 +230,20 @@ function Dashboard({ days, isDemo }) {
       if (diasRestantes > 0 && semanaActual.horas > 0) {
         const lucroMediaDia = semanaActual.lucro / diasSemanaActual.length;
         const diasNecessarios = Math.ceil(falta / lucroMediaDia);
-        const horasNecessarias = semanaActual.horas > 0
-          ? Math.ceil(falta / mediaHoraSemana)
-          : null;
+        const horasNecessarias = Math.ceil(falta / mediaHoraSemana);
 
         if (diasNecessarios <= diasRestantes) {
           linhas.push(`📅 Ao teu ritmo actual (€${lucroMediaDia.toFixed(2)}/dia), precisas de mais ${diasNecessarios} dia${diasNecessarios > 1 ? 's' : ''} de trabalho para cobrir os custos.`);
         } else {
           linhas.push(`⚠️ Ao ritmo actual não consegues cobrir os custos esta semana. Considera aumentar as horas nos dias de maior procura.`);
         }
-
-        if (horasNecessarias) {
-          linhas.push(`⏱ Precisas de mais ${horasNecessarias}h de trabalho a €${mediaHoraSemana.toFixed(2)}/h para fechar o break-even.`);
-        }
+        linhas.push(`⏱ Precisas de mais ${horasNecessarias}h de trabalho a €${mediaHoraSemana.toFixed(2)}/h para fechar o break-even.`);
       } else if (diasRestantes === 0) {
         linhas.push(`📉 A semana terminou abaixo do break-even. Na próxima semana foca os primeiros dias para garantir a cobertura dos custos.`);
       }
     }
 
-    return {
-      tipo: margem >= 0 ? 'positivo' : 'negativo',
-      linhas,
-    };
+    return { tipo: margem >= 0 ? 'positivo' : 'negativo', linhas };
   }
 
   const analiseBreakEven = gerarAnaliseBreakEven();
@@ -152,34 +254,13 @@ function Dashboard({ days, isDemo }) {
       .filter((day) => {
         if (!day.date) return false;
         const date = new Date(day.date);
-        const diff = (today - date) / (1000 * 60 * 60 * 24);
+        const diff = (today.getTime() - date.getTime()) / (1000 * 60 * 60 * 24);
         if (period === '7d') return diff <= 7;
         if (period === '30d') return diff <= 30;
         return true;
       })
-      .sort((a, b) => new Date(a.date) - new Date(b.date));
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [days, period]);
-
-  function calcular(day) {
-    let ganho = 0, uber = 0, bolt = 0;
-    if (Array.isArray(day.rides) && day.rides.length > 0) {
-      day.rides.forEach((ride) => {
-        const valor = Number(ride.valor) || 0;
-        ganho += valor;
-        if (ride.plataforma === 'uber') uber += valor;
-        if (ride.plataforma === 'bolt') bolt += valor;
-      });
-    } else {
-      ganho = Number(day.ganho) || 0;
-      uber = Number(day.uberTotal) || 0;
-      bolt = Number(day.boltTotal) || 0;
-    }
-    const combustivel = Number(day.combustivel) || 0;
-    const operador = ganho * ((Number(day.operadorPercent) || 0) / 100);
-    const despesas = combustivel + operador;
-    const lucro = ganho - despesas;
-    return { ganho, uber, bolt, combustivel, operador, despesas, lucro, horas: Number(day.horas) || 0 };
-  }
 
   const totals = filteredDays.reduce(
     (acc, day) => {
@@ -194,8 +275,8 @@ function Dashboard({ days, isDemo }) {
 
   const mediaHora = totals.horas > 0 ? totals.lucro / totals.horas : 0;
 
-  const weeklyData = useMemo(() => {
-    const weeks = {};
+  const weeklyData = useMemo((): WeekData[] => {
+    const weeks: WeekAccumulator = {};
     filteredDays.forEach((day) => {
       const date = new Date(day.date);
       const dayOfWeek = date.getDay();
@@ -209,13 +290,15 @@ function Dashboard({ days, isDemo }) {
       weeks[key].despesas += d.despesas; weeks[key].uber += d.uber;
       weeks[key].bolt += d.bolt; weeks[key].dias += 1;
     });
+
+    const fmt = (d: Date) => `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`;
+
     return Object.entries(weeks)
-      .sort(([a], [b]) => new Date(a) - new Date(b))
+      .sort(([a], [b]) => new Date(a).getTime() - new Date(b).getTime())
       .map(([monday, data]) => {
         const date = new Date(monday);
         const end = new Date(date);
         end.setDate(date.getDate() + 6);
-        const fmt = (d) => `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`;
         const label = isMobile ? fmt(date) : `${fmt(date)} – ${fmt(end)}`;
         return { label, labelFull: `${fmt(date)} – ${fmt(end)}`, ...data };
       });
@@ -232,14 +315,14 @@ function Dashboard({ days, isDemo }) {
 
   const trendChartOptions = {
     responsive: true, maintainAspectRatio: false,
-    interaction: { mode: 'index', intersect: false },
+    interaction: { mode: 'index' as const, intersect: false },
     plugins: {
-      legend: { labels: { color: '#475569', font: { weight: 700, size: isMobile ? 11 : 12 }, usePointStyle: true, pointStyleWidth: 8 } },
-      tooltip: { backgroundColor: '#0f172a', padding: 12, callbacks: { label: (ctx) => ` ${ctx.dataset.label}: €${Number(ctx.raw).toFixed(2)}` } },
+      legend: { labels: { color: '#475569', font: { weight: 700 as const, size: isMobile ? 11 : 12 }, usePointStyle: true, pointStyleWidth: 8 } },
+      tooltip: { backgroundColor: '#0f172a', padding: 12, callbacks: { label: (ctx: { dataset: { label: string }; raw: unknown }) => ` ${ctx.dataset.label}: €${Number(ctx.raw).toFixed(2)}` } },
     },
     scales: {
-      x: { grid: { display: false }, ticks: { color: '#64748b', font: { weight: 700, size: isMobile ? 10 : 12 }, maxRotation: 0 } },
-      y: { beginAtZero: true, ticks: { color: '#64748b', font: { size: isMobile ? 10 : 12 }, callback: (v) => `€${v}` }, grid: { color: '#e5e7eb' } },
+      x: { grid: { display: false }, ticks: { color: '#64748b', font: { weight: 700 as const, size: isMobile ? 10 : 12 }, maxRotation: 0 } },
+      y: { beginAtZero: true, ticks: { color: '#64748b', font: { size: isMobile ? 10 : 12 }, callback: (v: number | string) => `€${v}` }, grid: { color: '#e5e7eb' } },
     },
   };
 
@@ -256,16 +339,16 @@ function Dashboard({ days, isDemo }) {
   const chartOptions = {
     responsive: true, maintainAspectRatio: false,
     plugins: {
-      legend: { labels: { color: '#475569', font: { weight: 700, size: isMobile ? 10 : 12 } } },
-      tooltip: { backgroundColor: '#0f172a', padding: 12, callbacks: { label: (ctx) => `${ctx.dataset.label}: €${Number(ctx.raw).toFixed(2)}` } },
+      legend: { labels: { color: '#475569', font: { weight: 700 as const, size: isMobile ? 10 : 12 } } },
+      tooltip: { backgroundColor: '#0f172a', padding: 12, callbacks: { label: (ctx: { dataset: { label: string }; raw: unknown }) => `${ctx.dataset.label}: €${Number(ctx.raw).toFixed(2)}` } },
     },
     scales: {
-      x: { grid: { display: false }, ticks: { color: '#64748b', font: { weight: 700, size: isMobile ? 8 : 12 }, maxRotation: isMobile ? 45 : 0, maxTicksLimit: isMobile ? 10 : 999 } },
-      y: { beginAtZero: true, ticks: { color: '#64748b', font: { size: isMobile ? 10 : 12 }, callback: (v) => `€${v}` }, grid: { color: '#e5e7eb' } },
+      x: { grid: { display: false }, ticks: { color: '#64748b', font: { weight: 700 as const, size: isMobile ? 8 : 12 }, maxRotation: isMobile ? 45 : 0, maxTicksLimit: isMobile ? 10 : 999 } },
+      y: { beginAtZero: true, ticks: { color: '#64748b', font: { size: isMobile ? 10 : 12 }, callback: (v: number | string) => `€${v}` }, grid: { color: '#e5e7eb' } },
     },
   };
 
-  function gerarAnaliseIA() {
+  function gerarAnaliseIA(): string {
     if (filteredDays.length === 0) return 'Sem dados suficientes para gerar uma análise.';
     let texto = '📊 Análise Inteligente\n\n';
     texto += `Lucro total: €${totals.lucro.toFixed(2)}\n`;
@@ -284,9 +367,11 @@ function Dashboard({ days, isDemo }) {
     if (weeklyData.length >= 2) {
       const ultima = weeklyData[weeklyData.length - 1];
       const penultima = weeklyData[weeklyData.length - 2];
-      const diff = ultima.lucro - penultima.lucro;
-      if (diff > 0) texto += `📈 A última semana foi €${diff.toFixed(2)} melhor que a anterior.\n`;
-      else if (diff < 0) texto += `📉 A última semana foi €${Math.abs(diff).toFixed(2)} pior que a anterior.\n`;
+      if (ultima && penultima) {
+        const diff = ultima.lucro - penultima.lucro;
+        if (diff > 0) texto += `📈 A última semana foi €${diff.toFixed(2)} melhor que a anterior.\n`;
+        else if (diff < 0) texto += `📉 A última semana foi €${Math.abs(diff).toFixed(2)} pior que a anterior.\n`;
+      }
     }
     if (totals.uber > totals.bolt) texto += '💡 Uber teve melhor desempenho que Bolt neste período.\n';
     else if (totals.bolt > totals.uber) texto += '💡 Bolt teve melhor desempenho que Uber neste período.\n';
@@ -296,7 +381,8 @@ function Dashboard({ days, isDemo }) {
   }
 
   const s = isMobile ? mobileStyles : desktopStyles;
-  const breakEvenColors = {
+
+  const breakEvenColors: BreakEvenColors = {
     positivo: { background: '#f0fdf4', border: '1px solid #86efac' },
     negativo: { background: '#fef2f2', border: '1px solid #fca5a5' },
     info: { background: '#eef2ff', border: '1px solid #c7d2fe' },
@@ -304,7 +390,6 @@ function Dashboard({ days, isDemo }) {
 
   return (
     <div>
-      {/* Header */}
       <header style={s.header}>
         <div style={{ flex: 1 }}>
           <p style={s.eyebrow}>Performance Overview</p>
@@ -320,7 +405,6 @@ function Dashboard({ days, isDemo }) {
         </button>
       </header>
 
-      {/* ── Análise Break-Even Semanal ── */}
       {analiseBreakEven && (
         <section style={{ ...s.breakEvenBox, ...breakEvenColors[analiseBreakEven.tipo] }}>
           <p style={s.breakEvenTitulo}>
@@ -338,17 +422,15 @@ function Dashboard({ days, isDemo }) {
         </section>
       )}
 
-      {/* Filtros */}
       <section style={s.filters}>
-        {[{ label: '7 dias', value: '7d' }, { label: '30 dias', value: '30d' }, { label: 'Todos', value: 'all' }].map((item) => (
-          <button key={item.value} onClick={() => setPeriod(item.value)}
-            style={{ ...s.filter, ...(period === item.value ? s.filterActive : {}) }}>
-            {item.label}
+        {(['7d', '30d', 'all'] as Period[]).map((value) => (
+          <button key={value} onClick={() => setPeriod(value)}
+            style={{ ...s.filter, ...(period === value ? s.filterActive : {}) }}>
+            {value === '7d' ? '7 dias' : value === '30d' ? '30 dias' : 'Todos'}
           </button>
         ))}
       </section>
 
-      {/* KPI Grid */}
       <section style={s.kpiGrid}>
         <KpiCard title="Lucro Total" value={totals.lucro} color="#16a34a" featured isMobile={isMobile} />
         <KpiCard title="Ganho Total" value={totals.ganho} color="#2563eb" isMobile={isMobile} />
@@ -356,7 +438,6 @@ function Dashboard({ days, isDemo }) {
         <KpiCard title="€/Hora" value={mediaHora} color="#7c3aed" suffix="/h" isMobile={isMobile} />
       </section>
 
-      {/* Mini Grid */}
       <section style={s.miniGrid}>
         <MiniCard title="Uber" value={totals.uber} color="#22c55e" isMobile={isMobile} />
         <MiniCard title="Bolt" value={totals.bolt} color="#3b82f6" isMobile={isMobile} />
@@ -364,10 +445,8 @@ function Dashboard({ days, isDemo }) {
         <MiniCard title="Operador" value={totals.operador} color="#eab308" isMobile={isMobile} />
       </section>
 
-      {/* Insight IA */}
       {insight && <section style={s.insightBox}>{insight}</section>}
 
-      {/* Weekly Trend */}
       {weeklyData.length >= 2 && (
         <section style={s.chartCard}>
           <div style={s.chartHeader}>
@@ -403,7 +482,6 @@ function Dashboard({ days, isDemo }) {
         </section>
       )}
 
-      {/* Breakdown diário */}
       {(!isMobile || filteredDays.length <= 14) && (
         <section style={{ ...s.chartCard, marginTop: '16px' }}>
           <div style={s.chartHeader}>
@@ -431,27 +509,8 @@ function Dashboard({ days, isDemo }) {
   );
 }
 
-function KpiCard({ title, value, color, suffix = '', featured, isMobile }) {
-  const s = isMobile ? mobileStyles : desktopStyles;
-  return (
-    <article style={{ ...s.kpiCard, ...(featured ? s.kpiFeatured : {}) }}>
-      <p style={s.cardLabel}>{title}</p>
-      <h2 style={{ ...s.kpiValue, color }}>€ {Number(value).toFixed(2)}{suffix}</h2>
-    </article>
-  );
-}
-
-function MiniCard({ title, value, color, isMobile }) {
-  const s = isMobile ? mobileStyles : desktopStyles;
-  return (
-    <article style={s.miniCard}>
-      <p style={s.cardLabel}>{title}</p>
-      <h3 style={{ ...s.miniValue, color }}>€ {Number(value).toFixed(2)}</h3>
-    </article>
-  );
-}
-
-const desktopStyles = {
+// ── Estilos ───────────────────────────────────────────────────────────────────
+const desktopStyles: Styles = {
   header: { display: 'flex', justifyContent: 'space-between', gap: '20px', alignItems: 'flex-start', marginBottom: '24px' },
   eyebrow: { margin: 0, fontSize: '12px', fontWeight: 900, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#6366f1' },
   title: { margin: '8px 0', fontSize: '42px', fontWeight: 900, letterSpacing: '-0.04em' },
@@ -487,7 +546,7 @@ const desktopStyles = {
   weekDias: { margin: '6px 0 0', fontSize: '11px', color: '#94a3b8', fontWeight: 700 },
 };
 
-const mobileStyles = {
+const mobileStyles: Styles = {
   ...desktopStyles,
   header: { display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center', marginBottom: '16px' },
   title: { margin: '4px 0 0', fontSize: '26px', fontWeight: 900, letterSpacing: '-0.03em' },
