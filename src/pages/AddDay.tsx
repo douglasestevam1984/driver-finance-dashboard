@@ -1,12 +1,52 @@
-import { useContext } from 'react';
-import { useState } from 'react';
+import { useContext, useState, CSSProperties, FormEvent, ChangeEvent } from 'react';
 import { AppContext } from '../context/AppContext';
+import { Day, Ride } from '../types';
 
-function AddDay({ onSave }) {
+// ── Tipos ─────────────────────────────────────────────────────────────────────
+interface AddDayProps {
+  onSave: (day: Day) => void;
+}
+
+interface FormState {
+  date: string;
+  ganho: string;
+  uberTotal: string;
+  boltTotal: string;
+  combustivel: string;
+  horas: string;
+  rides: Ride[];
+}
+
+interface InputProps {
+  label: string;
+  type: string;
+  value: string;
+  onChange: (value: string) => void;
+}
+
+type Mode = 'total' | 'rides';
+
+// ── Componente Input ──────────────────────────────────────────────────────────
+function Input({ label, type, value, onChange }: InputProps) {
+  return (
+    <label style={styles.label}>
+      {label}
+      <input
+        type={type}
+        value={value}
+        onChange={(e: ChangeEvent<HTMLInputElement>) => onChange(e.target.value)}
+        style={styles.input}
+      />
+    </label>
+  );
+}
+
+// ── Componente principal ──────────────────────────────────────────────────────
+function AddDay({ onSave }: AddDayProps) {
   const { costs } = useContext(AppContext);
-  const [mode, setMode] = useState('total');
+  const [mode, setMode] = useState<Mode>('total');
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<FormState>({
     date: '',
     ganho: '',
     uberTotal: '',
@@ -16,29 +56,31 @@ function AddDay({ onSave }) {
     rides: [],
   });
 
-  const [ride, setRide] = useState({
+  const [ride, setRide] = useState<Ride>({
     plataforma: 'uber',
     valor: '',
   });
 
-  function addRide() {
+  function addRide(): void {
     if (!ride.valor) return;
     setForm((prev) => ({ ...prev, rides: [...prev.rides, ride] }));
     setRide({ plataforma: 'uber', valor: '' });
   }
 
-  function removeRide(index) {
-    setForm((prev) => ({ ...prev, rides: prev.rides.filter((_, i) => i !== index) }));
+  function removeRide(index: number): void {
+    setForm((prev) => ({
+      ...prev,
+      rides: prev.rides.filter((_, i) => i !== index),
+    }));
   }
 
-  function handleSubmit(e) {
+  function handleSubmit(e: FormEvent<HTMLFormElement>): void {
     e.preventDefault();
 
-    const newDay = {
+    const newDay: Day = {
       ...form,
       id: crypto.randomUUID(),
       mode,
-      // % operador vem dos custos fixos configurados globalmente
       operadorPercent: costs.operadorPercent || 0,
     };
 
@@ -55,13 +97,12 @@ function AddDay({ onSave }) {
     });
   }
 
-  // Calcula preview do lucro estimado em tempo real
-  let ganhoPreview = 0;
-  if (mode === 'rides') {
-    ganhoPreview = form.rides.reduce((s, r) => s + (Number(r.valor) || 0), 0);
-  } else {
-    ganhoPreview = Number(form.ganho) || 0;
-  }
+  // Preview do lucro em tempo real
+  const ganhoPreview: number =
+    mode === 'rides'
+      ? form.rides.reduce((s, r) => s + (Number(r.valor) || 0), 0)
+      : Number(form.ganho) || 0;
+
   const combustivelPreview = Number(form.combustivel) || 0;
   const operadorPreview = ganhoPreview * ((Number(costs.operadorPercent) || 0) / 100);
   const lucroPreview = ganhoPreview - combustivelPreview - operadorPreview;
@@ -76,7 +117,6 @@ function AddDay({ onSave }) {
         </p>
       </header>
 
-      {/* Info do operador configurado */}
       {costs.operadorPercent > 0 && (
         <div style={styles.operadorInfo}>
           <span>⚙️ % Operador configurado: <strong>{costs.operadorPercent}%</strong></span>
@@ -86,12 +126,18 @@ function AddDay({ onSave }) {
 
       <section style={styles.card}>
         <div style={styles.modeSwitch}>
-          <button type="button" onClick={() => setMode('total')}
-            style={{ ...styles.modeButton, ...(mode === 'total' ? styles.modeActive : {}) }}>
+          <button
+            type="button"
+            onClick={() => setMode('total')}
+            style={{ ...styles.modeButton, ...(mode === 'total' ? styles.modeActive : {}) }}
+          >
             Total do dia
           </button>
-          <button type="button" onClick={() => setMode('rides')}
-            style={{ ...styles.modeButton, ...(mode === 'rides' ? styles.modeActive : {}) }}>
+          <button
+            type="button"
+            onClick={() => setMode('rides')}
+            style={{ ...styles.modeButton, ...(mode === 'rides' ? styles.modeActive : {}) }}
+          >
             Por corrida
           </button>
         </div>
@@ -115,24 +161,39 @@ function AddDay({ onSave }) {
             <div style={styles.ridesBox}>
               <h3 style={styles.boxTitle}>Adicionar corrida</h3>
               <div style={styles.rideRow}>
-                <select value={ride.plataforma}
-                  onChange={(e) => setRide({ ...ride, plataforma: e.target.value })}
-                  style={styles.select}>
+                <select
+                  value={ride.plataforma}
+                  onChange={(e: ChangeEvent<HTMLSelectElement>) =>
+                    setRide({ ...ride, plataforma: e.target.value as 'uber' | 'bolt' })
+                  }
+                  style={styles.select}
+                >
                   <option value="uber">Uber</option>
                   <option value="bolt">Bolt</option>
                 </select>
-                <input type="number" placeholder="Valor da corrida" value={ride.valor}
-                  onChange={(e) => setRide({ ...ride, valor: e.target.value })}
-                  style={styles.input} />
+                <input
+                  type="number"
+                  placeholder="Valor da corrida"
+                  value={ride.valor}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                    setRide({ ...ride, valor: e.target.value })
+                  }
+                  style={styles.input}
+                />
                 <button type="button" onClick={addRide} style={styles.addButton}>+</button>
               </div>
+
               {form.rides.length > 0 && (
                 <div style={styles.rideList}>
                   {form.rides.map((item, index) => (
                     <div key={index} style={styles.rideItem}>
                       <span>{item.plataforma.toUpperCase()}</span>
                       <strong>€ {Number(item.valor).toFixed(2)}</strong>
-                      <button type="button" onClick={() => removeRide(index)} style={styles.removeButton}>
+                      <button
+                        type="button"
+                        onClick={() => removeRide(index)}
+                        style={styles.removeButton}
+                      >
                         Remover
                       </button>
                     </div>
@@ -144,11 +205,9 @@ function AddDay({ onSave }) {
 
           <Input label="Combustível" type="number" value={form.combustivel}
             onChange={(value) => setForm({ ...form, combustivel: value })} />
-
           <Input label="Horas trabalhadas" type="number" value={form.horas}
             onChange={(value) => setForm({ ...form, horas: value })} />
 
-          {/* Preview do lucro estimado */}
           {ganhoPreview > 0 && (
             <div style={styles.preview}>
               <p style={styles.previewTitle}>📊 Estimativa do dia</p>
@@ -182,16 +241,10 @@ function AddDay({ onSave }) {
   );
 }
 
-function Input({ label, type, value, onChange }) {
-  return (
-    <label style={styles.label}>
-      {label}
-      <input type={type} value={value} onChange={(e) => onChange(e.target.value)} style={styles.input} />
-    </label>
-  );
-}
+// ── Estilos ───────────────────────────────────────────────────────────────────
+type Styles = Record<string, CSSProperties>;
 
-const styles = {
+const styles: Styles = {
   header: { marginBottom: '24px' },
   eyebrow: { margin: 0, fontSize: '12px', fontWeight: 900, letterSpacing: '0.14em', color: '#6366f1', textTransform: 'uppercase' },
   title: { margin: '8px 0', fontSize: '42px', fontWeight: 900 },
