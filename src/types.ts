@@ -10,6 +10,9 @@ export interface Day {
   ganho: string;
   uberTotal: string;
   boltTotal: string;
+  gorjetaUber?: string;
+  gorjetaBolt?: string;
+  gorjetaDinheiro?: string;
   combustivel: string;
   operadorPercent: string | number;
   horas: string;

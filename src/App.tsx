@@ -4,6 +4,7 @@ import Dashboard from './pages/Dashboard';
 import AddDay from './pages/AddDay';
 import History from './pages/History';
 import Costs from './pages/Costs';
+import Documents from './pages/Documents';
 import { demoData } from './data/demoData';
 import { Day } from './types';
 
@@ -18,15 +19,35 @@ function useIsMobile(): boolean {
   return isMobile;
 }
 
-// ── Tipo para nav items ───────────────────────────────────────────────────────
+// ── Tipos ─────────────────────────────────────────────────────────────────────
 interface NavItem {
   label: string;
   path: string;
+  badge?: number;
+}
+
+interface StoredDocument {
+  id: string;
+  dataValidade: string;
+}
+
+// ── Conta documentos urgentes para badge ──────────────────────────────────────
+function contarDocumentosUrgentes(): number {
+  const saved = localStorage.getItem('driver-documents');
+  if (!saved) return 0;
+  const docs = JSON.parse(saved) as StoredDocument[];
+  const hoje = new Date();
+  return docs.filter((d) => {
+    const validade = new Date(d.dataValidade);
+    const dias = Math.ceil((validade.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
+    return dias <= 30;
+  }).length;
 }
 
 function App() {
   const [isDemo, setIsDemo] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [docAlerts, setDocAlerts] = useState(() => contarDocumentosUrgentes());
   const isMobile = useIsMobile();
   const navigate = useNavigate();
   const location = useLocation();
@@ -52,6 +73,11 @@ function App() {
     }
   }, [days, isDemo]);
 
+  // Actualiza badge quando navega para documentos
+  useEffect(() => {
+    setDocAlerts(contarDocumentosUrgentes());
+  }, [location.pathname]);
+
   function goTo(path: string): void {
     navigate(path);
     setMenuOpen(false);
@@ -73,6 +99,7 @@ function App() {
     { label: '➕ Adicionar Dia', path: '/add' },
     { label: '📋 Histórico', path: '/history' },
     { label: '💰 Custos Fixos', path: '/costs' },
+    { label: '📄 Documentos', path: '/documents', badge: docAlerts > 0 ? docAlerts : undefined },
   ];
 
   const currentPath = location.pathname;
@@ -83,6 +110,7 @@ function App() {
       <Route path="/add" element={<AddDay onSave={handleAddDay} />} />
       <Route path="/history" element={<History days={days} setDays={setDays} isDemo={isDemo} />} />
       <Route path="/costs" element={<Costs days={days} />} />
+      <Route path="/documents" element={<Documents />} />
     </Routes>
   );
 
@@ -118,7 +146,10 @@ function App() {
                   }}
                   onClick={() => goTo(item.path)}
                 >
-                  {item.label}
+                  <span style={{ flex: 1, textAlign: 'left' }}>{item.label}</span>
+                  {item.badge && item.badge > 0 && (
+                    <span style={mobile.drawerBadge}>{item.badge}</span>
+                  )}
                 </button>
               ))}
             </nav>
@@ -127,8 +158,9 @@ function App() {
 
         <main style={mobile.main}>{pageContent}</main>
 
+        {/* Bottom nav — mostra só os 4 principais, documentos vai para o drawer */}
         <nav style={mobile.bottomNav}>
-          {navItems.map((item) => (
+          {navItems.slice(0, 4).map((item) => (
             <button
               key={item.path}
               style={{
@@ -143,6 +175,21 @@ function App() {
               </span>
             </button>
           ))}
+          {/* Botão documentos com badge */}
+          <button
+            style={{
+              ...mobile.bottomItem,
+              ...(currentPath === '/documents' ? mobile.bottomActive : {}),
+              position: 'relative',
+            }}
+            onClick={() => goTo('/documents')}
+          >
+            {docAlerts > 0 && (
+              <span style={mobile.badge}>{docAlerts}</span>
+            )}
+            <span style={mobile.bottomIcon}>📄</span>
+            <span style={mobile.bottomLabel}>Docs</span>
+          </button>
         </nav>
       </div>
     );
@@ -171,10 +218,14 @@ function App() {
               style={{
                 ...desktop.navItem,
                 ...(currentPath === item.path ? desktop.navActive : {}),
+                position: 'relative',
               }}
               onClick={() => goTo(item.path)}
             >
               {item.label}
+              {item.badge && item.badge > 0 && (
+                <span style={desktop.navBadge}>{item.badge}</span>
+              )}
             </button>
           ))}
         </nav>
@@ -198,14 +249,16 @@ const mobile: Styles = {
   overlay: { position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.4)', zIndex: 200 },
   drawer: { position: 'fixed', top: 0, right: 0, width: '260px', height: '100vh', background: '#ffffff', zIndex: 300, padding: '28px 20px', display: 'flex', flexDirection: 'column', gap: '10px', boxShadow: '-8px 0 30px rgba(15,23,42,0.12)' },
   drawerTitle: { margin: '0 0 10px', fontSize: '11px', fontWeight: 900, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#94a3b8' },
-  drawerItem: { padding: '14px 16px', borderRadius: '14px', border: 'none', background: 'transparent', color: '#475569', fontWeight: 800, textAlign: 'left', cursor: 'pointer', fontSize: '15px', width: '100%' },
+  drawerItem: { padding: '14px 16px', borderRadius: '14px', border: 'none', background: 'transparent', color: '#475569', fontWeight: 800, textAlign: 'left', cursor: 'pointer', fontSize: '15px', width: '100%', display: 'flex', alignItems: 'center' },
   drawerActive: { background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', color: '#ffffff', boxShadow: '0 10px 24px rgba(79,70,229,0.25)' },
+  drawerBadge: { background: '#dc2626', color: '#ffffff', borderRadius: '999px', fontSize: '11px', fontWeight: 900, padding: '2px 7px', marginLeft: '8px' },
   main: { flex: 1, padding: '20px 16px', paddingBottom: '90px', overflowX: 'hidden' },
   bottomNav: { position: 'fixed', bottom: 0, left: 0, right: 0, display: 'flex', background: '#ffffff', borderTop: '1px solid #e5e7eb', boxShadow: '0 -4px 20px rgba(15,23,42,0.08)', zIndex: 100 },
   bottomItem: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', padding: '8px 0 12px', border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8' },
   bottomActive: { color: '#4f46e5' },
   bottomIcon: { fontSize: '18px', lineHeight: 1 },
   bottomLabel: { fontSize: '9px', fontWeight: 800, letterSpacing: '0.02em' },
+  badge: { position: 'absolute', top: '6px', right: '10px', background: '#dc2626', color: '#ffffff', borderRadius: '999px', fontSize: '10px', fontWeight: 900, padding: '1px 5px', minWidth: '16px', textAlign: 'center' },
 };
 
 // ── Desktop styles ────────────────────────────────────────────────────────────
@@ -217,8 +270,9 @@ const desktop: Styles = {
   demoBadge: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '18px', padding: '8px 12px', borderRadius: '10px', background: '#fef9c3', color: '#854d0e', fontSize: '12px', fontWeight: 800, letterSpacing: '0.05em' },
   demoDot: { display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: '#eab308', flexShrink: 0 },
   nav: { display: 'flex', flexDirection: 'column', gap: '12px' },
-  navItem: { padding: '14px 16px', borderRadius: '16px', border: 'none', background: 'transparent', color: '#475569', fontWeight: 800, textAlign: 'left', cursor: 'pointer', fontSize: '15px' },
+  navItem: { padding: '14px 16px', borderRadius: '16px', border: 'none', background: 'transparent', color: '#475569', fontWeight: 800, textAlign: 'left', cursor: 'pointer', fontSize: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   navActive: { background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', color: '#ffffff', boxShadow: '0 14px 30px rgba(79,70,229,0.28)' },
+  navBadge: { background: '#dc2626', color: '#ffffff', borderRadius: '999px', fontSize: '11px', fontWeight: 900, padding: '2px 7px' },
   main: { flex: 1, padding: '36px', overflowX: 'hidden' },
 };
 

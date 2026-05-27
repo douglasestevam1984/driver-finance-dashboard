@@ -9,9 +9,11 @@ interface AddDayProps {
 
 interface FormState {
   date: string;
-  ganho: string;
   uberTotal: string;
   boltTotal: string;
+  gorjetaUber: string;
+  gorjetaBolt: string;
+  gorjetaDinheiro: string;
   combustivel: string;
   horas: string;
   rides: Ride[];
@@ -22,12 +24,15 @@ interface InputProps {
   type: string;
   value: string;
   onChange: (value: string) => void;
+  readOnly?: boolean;
+  highlight?: boolean;
 }
 
 type Mode = 'total' | 'rides';
+type Styles = Record<string, CSSProperties>;
 
 // ── Componente Input ──────────────────────────────────────────────────────────
-function Input({ label, type, value, onChange }: InputProps) {
+function Input({ label, type, value, onChange, readOnly, highlight }: InputProps) {
   return (
     <label style={styles.label}>
       {label}
@@ -35,7 +40,12 @@ function Input({ label, type, value, onChange }: InputProps) {
         type={type}
         value={value}
         onChange={(e: ChangeEvent<HTMLInputElement>) => onChange(e.target.value)}
-        style={styles.input}
+        style={{
+          ...styles.input,
+          ...(readOnly ? styles.inputReadOnly : {}),
+          ...(highlight ? styles.inputHighlight : {}),
+        }}
+        readOnly={readOnly}
       />
     </label>
   );
@@ -48,9 +58,11 @@ function AddDay({ onSave }: AddDayProps) {
 
   const [form, setForm] = useState<FormState>({
     date: '',
-    ganho: '',
     uberTotal: '',
     boltTotal: '',
+    gorjetaUber: '',
+    gorjetaBolt: '',
+    gorjetaDinheiro: '',
     combustivel: '',
     horas: '',
     rides: [],
@@ -60,6 +72,25 @@ function AddDay({ onSave }: AddDayProps) {
     plataforma: 'uber',
     valor: '',
   });
+
+  // ── Cálculo automático do ganho total ─────────────────────────────────────
+  const ganhoCalculado: number =
+    mode === 'rides'
+      ? form.rides.reduce((s, r) => s + (Number(r.valor) || 0), 0)
+      : (Number(form.uberTotal) || 0) +
+        (Number(form.boltTotal) || 0) +
+        (Number(form.gorjetaUber) || 0) +
+        (Number(form.gorjetaBolt) || 0) +
+        (Number(form.gorjetaDinheiro) || 0);
+
+  const totalGorjetas: number =
+    (Number(form.gorjetaUber) || 0) +
+    (Number(form.gorjetaBolt) || 0) +
+    (Number(form.gorjetaDinheiro) || 0);
+
+  const combustivelPreview = Number(form.combustivel) || 0;
+  const operadorPreview = ganhoCalculado * ((Number(costs.operadorPercent) || 0) / 100);
+  const lucroPreview = ganhoCalculado - combustivelPreview - operadorPreview;
 
   function addRide(): void {
     if (!ride.valor) return;
@@ -81,6 +112,7 @@ function AddDay({ onSave }: AddDayProps) {
       ...form,
       id: crypto.randomUUID(),
       mode,
+      ganho: String(ganhoCalculado),
       operadorPercent: costs.operadorPercent || 0,
     };
 
@@ -88,24 +120,16 @@ function AddDay({ onSave }: AddDayProps) {
 
     setForm({
       date: '',
-      ganho: '',
       uberTotal: '',
       boltTotal: '',
+      gorjetaUber: '',
+      gorjetaBolt: '',
+      gorjetaDinheiro: '',
       combustivel: '',
       horas: '',
       rides: [],
     });
   }
-
-  // Preview do lucro em tempo real
-  const ganhoPreview: number =
-    mode === 'rides'
-      ? form.rides.reduce((s, r) => s + (Number(r.valor) || 0), 0)
-      : Number(form.ganho) || 0;
-
-  const combustivelPreview = Number(form.combustivel) || 0;
-  const operadorPreview = ganhoPreview * ((Number(costs.operadorPercent) || 0) / 100);
-  const lucroPreview = ganhoPreview - combustivelPreview - operadorPreview;
 
   return (
     <div>
@@ -148,12 +172,44 @@ function AddDay({ onSave }: AddDayProps) {
 
           {mode === 'total' && (
             <>
-              <Input label="Ganho total" type="number" value={form.ganho}
-                onChange={(value) => setForm({ ...form, ganho: value })} />
+              {/* Ganho Total — calculado automaticamente */}
+              <label style={styles.label}>
+                Ganho Total
+                <div style={styles.ganhoWrapper}>
+                  <span style={styles.ganhoEuro}>€</span>
+                  <input
+                    type="number"
+                    value={ganhoCalculado > 0 ? ganhoCalculado.toFixed(2) : ''}
+                    readOnly
+                    style={styles.ganhoInput}
+                    placeholder="Calculado automaticamente"
+                  />
+                  <span style={styles.ganhoAuto}>auto</span>
+                </div>
+              </label>
+
               <Input label="Total Uber" type="number" value={form.uberTotal}
                 onChange={(value) => setForm({ ...form, uberTotal: value })} />
               <Input label="Total Bolt" type="number" value={form.boltTotal}
                 onChange={(value) => setForm({ ...form, boltTotal: value })} />
+
+              {/* Secção de Gorjetas */}
+              <div style={styles.gorjetasBox}>
+                <p style={styles.gorjetasTitle}>🎁 Gorjetas</p>
+                <div style={styles.gorjetasGrid}>
+                  <Input label="Gorjeta Uber (app)" type="number" value={form.gorjetaUber}
+                    onChange={(value) => setForm({ ...form, gorjetaUber: value })} />
+                  <Input label="Gorjeta Bolt (app)" type="number" value={form.gorjetaBolt}
+                    onChange={(value) => setForm({ ...form, gorjetaBolt: value })} />
+                  <Input label="Gorjeta Dinheiro" type="number" value={form.gorjetaDinheiro}
+                    onChange={(value) => setForm({ ...form, gorjetaDinheiro: value })} />
+                </div>
+                {totalGorjetas > 0 && (
+                  <p style={styles.gorjetasTotal}>
+                    Total gorjetas: <strong>€{totalGorjetas.toFixed(2)}</strong>
+                  </p>
+                )}
+              </div>
             </>
           )}
 
@@ -182,7 +238,6 @@ function AddDay({ onSave }: AddDayProps) {
                 />
                 <button type="button" onClick={addRide} style={styles.addButton}>+</button>
               </div>
-
               {form.rides.length > 0 && (
                 <div style={styles.rideList}>
                   {form.rides.map((item, index) => (
@@ -208,13 +263,20 @@ function AddDay({ onSave }: AddDayProps) {
           <Input label="Horas trabalhadas" type="number" value={form.horas}
             onChange={(value) => setForm({ ...form, horas: value })} />
 
-          {ganhoPreview > 0 && (
+          {/* Preview do lucro */}
+          {ganhoCalculado > 0 && (
             <div style={styles.preview}>
               <p style={styles.previewTitle}>📊 Estimativa do dia</p>
               <div style={styles.previewRow}>
                 <span>Ganho bruto</span>
-                <strong>€{ganhoPreview.toFixed(2)}</strong>
+                <strong>€{ganhoCalculado.toFixed(2)}</strong>
               </div>
+              {totalGorjetas > 0 && (
+                <div style={{ ...styles.previewRow, color: '#16a34a' }}>
+                  <span>↳ do qual gorjetas</span>
+                  <span>€{totalGorjetas.toFixed(2)}</span>
+                </div>
+              )}
               <div style={styles.previewRow}>
                 <span>Combustível</span>
                 <span style={{ color: '#dc2626' }}>-€{combustivelPreview.toFixed(2)}</span>
@@ -242,8 +304,6 @@ function AddDay({ onSave }: AddDayProps) {
 }
 
 // ── Estilos ───────────────────────────────────────────────────────────────────
-type Styles = Record<string, CSSProperties>;
-
 const styles: Styles = {
   header: { marginBottom: '24px' },
   eyebrow: { margin: 0, fontSize: '12px', fontWeight: 900, letterSpacing: '0.14em', color: '#6366f1', textTransform: 'uppercase' },
@@ -258,6 +318,16 @@ const styles: Styles = {
   form: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '18px' },
   label: { display: 'flex', flexDirection: 'column', gap: '8px', color: '#475569', fontWeight: 800 },
   input: { padding: '14px 16px', borderRadius: '14px', border: '1px solid #cbd5e1', fontSize: '15px', outline: 'none' },
+  inputReadOnly: { background: '#f8fafc', color: '#64748b' },
+  inputHighlight: { background: '#f0fdf4', border: '1px solid #86efac', color: '#15803d', fontWeight: 900 },
+  ganhoWrapper: { display: 'flex', alignItems: 'center', border: '1px solid #86efac', borderRadius: '14px', overflow: 'hidden', background: '#f0fdf4' },
+  ganhoEuro: { padding: '14px 14px', background: '#dcfce7', color: '#15803d', fontWeight: 900, fontSize: '15px', borderRight: '1px solid #86efac' },
+  ganhoInput: { flex: 1, padding: '14px 12px', border: 'none', outline: 'none', fontSize: '15px', background: 'transparent', color: '#15803d', fontWeight: 900 },
+  ganhoAuto: { padding: '14px 12px', fontSize: '11px', fontWeight: 900, color: '#16a34a', letterSpacing: '0.08em', textTransform: 'uppercase' },
+  gorjetasBox: { gridColumn: '1 / -1', padding: '20px', borderRadius: '20px', background: '#fffbeb', border: '1px solid #fde68a' },
+  gorjetasTitle: { margin: '0 0 16px', fontWeight: 900, fontSize: '15px', color: '#92400e' },
+  gorjetasGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px' },
+  gorjetasTotal: { margin: '14px 0 0', fontSize: '14px', color: '#92400e', fontWeight: 700 },
   select: { padding: '14px 16px', borderRadius: '14px', border: '1px solid #cbd5e1', fontSize: '15px' },
   ridesBox: { gridColumn: '1 / -1', padding: '20px', borderRadius: '20px', background: '#f8fafc', border: '1px solid #e2e8f0' },
   boxTitle: { marginTop: 0 },
