@@ -45,6 +45,7 @@ interface DayCalc {
   ganho: number;
   uber: number;
   bolt: number;
+  gorjetas: number;
   combustivel: number;
   operador: number;
   despesas: number;
@@ -143,11 +144,18 @@ function calcular(day: Day): DayCalc {
     uber = Number(day.uberTotal) || 0;
     bolt = Number(day.boltTotal) || 0;
   }
+
+  // Gorjetas — somadas separadamente para visibilidade
+  const gorjetas =
+    (Number(day.gorjetaUber) || 0) +
+    (Number(day.gorjetaBolt) || 0) +
+    (Number(day.gorjetaDinheiro) || 0);
+
   const combustivel = Number(day.combustivel) || 0;
   const operador = ganho * ((Number(day.operadorPercent) || 0) / 100);
   const despesas = combustivel + operador;
   const lucro = ganho - despesas;
-  return { ganho, uber, bolt, combustivel, operador, despesas, lucro, horas: Number(day.horas) || 0 };
+  return { ganho, uber, bolt, gorjetas, combustivel, operador, despesas, lucro, horas: Number(day.horas) || 0 };
 }
 
 // ── Componentes auxiliares ────────────────────────────────────────────────────
@@ -210,11 +218,9 @@ function Dashboard({ days, isDemo }: DashboardProps) {
         ],
       };
     }
-
     const hojeIndex = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1;
     const diasRestantes = 6 - hojeIndex;
     const linhas: string[] = [];
-
     if (margem >= 0) {
       const percentagem = Math.round((semanaActual.lucro / custoSemanal) * 100);
       linhas.push(`✅ Estás acima do break-even esta semana.`);
@@ -226,12 +232,10 @@ function Dashboard({ days, isDemo }: DashboardProps) {
       const falta = Math.abs(margem);
       linhas.push(`🚨 Ainda faltam €${falta.toFixed(2)} para cobrir os custos fixos desta semana.`);
       linhas.push(`Lucro actual: €${semanaActual.lucro.toFixed(2)} · Necessário: €${custoSemanal.toFixed(2)}`);
-
       if (diasRestantes > 0 && semanaActual.horas > 0) {
         const lucroMediaDia = semanaActual.lucro / diasSemanaActual.length;
         const diasNecessarios = Math.ceil(falta / lucroMediaDia);
         const horasNecessarias = Math.ceil(falta / mediaHoraSemana);
-
         if (diasNecessarios <= diasRestantes) {
           linhas.push(`📅 Ao teu ritmo actual (€${lucroMediaDia.toFixed(2)}/dia), precisas de mais ${diasNecessarios} dia${diasNecessarios > 1 ? 's' : ''} de trabalho para cobrir os custos.`);
         } else {
@@ -242,7 +246,6 @@ function Dashboard({ days, isDemo }: DashboardProps) {
         linhas.push(`📉 A semana terminou abaixo do break-even. Na próxima semana foca os primeiros dias para garantir a cobertura dos custos.`);
       }
     }
-
     return { tipo: margem >= 0 ? 'positivo' : 'negativo', linhas };
   }
 
@@ -266,11 +269,12 @@ function Dashboard({ days, isDemo }: DashboardProps) {
     (acc, day) => {
       const d = calcular(day);
       acc.ganho += d.ganho; acc.uber += d.uber; acc.bolt += d.bolt;
+      acc.gorjetas += d.gorjetas;
       acc.combustivel += d.combustivel; acc.operador += d.operador;
       acc.despesas += d.despesas; acc.lucro += d.lucro; acc.horas += d.horas;
       return acc;
     },
-    { ganho: 0, uber: 0, bolt: 0, combustivel: 0, operador: 0, despesas: 0, lucro: 0, horas: 0 },
+    { ganho: 0, uber: 0, bolt: 0, gorjetas: 0, combustivel: 0, operador: 0, despesas: 0, lucro: 0, horas: 0 },
   );
 
   const mediaHora = totals.horas > 0 ? totals.lucro / totals.horas : 0;
@@ -353,6 +357,7 @@ function Dashboard({ days, isDemo }: DashboardProps) {
     let texto = '📊 Análise Inteligente\n\n';
     texto += `Lucro total: €${totals.lucro.toFixed(2)}\n`;
     texto += `Ganho total: €${totals.ganho.toFixed(2)}\n`;
+    if (totals.gorjetas > 0) texto += `Total gorjetas: €${totals.gorjetas.toFixed(2)}\n`;
     texto += `Despesas totais: €${totals.despesas.toFixed(2)}\n`;
     texto += `Média por hora: €${mediaHora.toFixed(2)}\n`;
     if (temCustos) texto += `Custo fixo semanal: €${custoSemanal.toFixed(2)}\n`;
@@ -381,7 +386,6 @@ function Dashboard({ days, isDemo }: DashboardProps) {
   }
 
   const s = isMobile ? mobileStyles : desktopStyles;
-
   const breakEvenColors: BreakEvenColors = {
     positivo: { background: '#f0fdf4', border: '1px solid #86efac' },
     negativo: { background: '#fef2f2', border: '1px solid #fca5a5' },
@@ -441,6 +445,7 @@ function Dashboard({ days, isDemo }: DashboardProps) {
       <section style={s.miniGrid}>
         <MiniCard title="Uber" value={totals.uber} color="#22c55e" isMobile={isMobile} />
         <MiniCard title="Bolt" value={totals.bolt} color="#3b82f6" isMobile={isMobile} />
+        <MiniCard title="Gorjetas 🎁" value={totals.gorjetas} color="#f59e0b" isMobile={isMobile} />
         <MiniCard title="Combustível" value={totals.combustivel} color="#f97316" isMobile={isMobile} />
         <MiniCard title="Operador" value={totals.operador} color="#eab308" isMobile={isMobile} />
       </section>
