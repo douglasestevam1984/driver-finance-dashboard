@@ -2,7 +2,6 @@ import { useContext, useState, CSSProperties, FormEvent, ChangeEvent } from 'rea
 import { AppContext } from '../context/AppContext';
 import { Day, Ride } from '../types';
 
-// ── Tipos ─────────────────────────────────────────────────────────────────────
 interface AddDayProps {
   onSave: (day: Day) => void;
 }
@@ -16,6 +15,8 @@ interface FormState {
   gorjetaDinheiro: string;
   combustivel: string;
   horas: string;
+  kmInicio: string;
+  kmFim: string;
   rides: Ride[];
 }
 
@@ -26,13 +27,13 @@ interface InputProps {
   onChange: (value: string) => void;
   readOnly?: boolean;
   highlight?: boolean;
+  placeholder?: string;
 }
 
 type Mode = 'total' | 'rides';
 type Styles = Record<string, CSSProperties>;
 
-// ── Componente Input ──────────────────────────────────────────────────────────
-function Input({ label, type, value, onChange, readOnly, highlight }: InputProps) {
+function Input({ label, type, value, onChange, readOnly, highlight, placeholder }: InputProps) {
   return (
     <label style={styles.label}>
       {label}
@@ -46,12 +47,12 @@ function Input({ label, type, value, onChange, readOnly, highlight }: InputProps
           ...(highlight ? styles.inputHighlight : {}),
         }}
         readOnly={readOnly}
+        placeholder={placeholder}
       />
     </label>
   );
 }
 
-// ── Componente principal ──────────────────────────────────────────────────────
 function AddDay({ onSave }: AddDayProps) {
   const { costs } = useContext(AppContext);
   const [mode, setMode] = useState<Mode>('total');
@@ -65,15 +66,13 @@ function AddDay({ onSave }: AddDayProps) {
     gorjetaDinheiro: '',
     combustivel: '',
     horas: '',
+    kmInicio: '',
+    kmFim: '',
     rides: [],
   });
 
-  const [ride, setRide] = useState<Ride>({
-    plataforma: 'uber',
-    valor: '',
-  });
+  const [ride, setRide] = useState<Ride>({ plataforma: 'uber', valor: '' });
 
-  // ── Cálculo automático do ganho total ─────────────────────────────────────
   const ganhoCalculado: number =
     mode === 'rides'
       ? form.rides.reduce((s, r) => s + (Number(r.valor) || 0), 0)
@@ -92,6 +91,17 @@ function AddDay({ onSave }: AddDayProps) {
   const operadorPreview = ganhoCalculado * ((Number(costs.operadorPercent) || 0) / 100);
   const lucroPreview = ganhoCalculado - combustivelPreview - operadorPreview;
 
+  // Km calculados automaticamente
+  const kmTotal: number =
+    form.kmInicio && form.kmFim
+      ? Math.max(0, (Number(form.kmFim) || 0) - (Number(form.kmInicio) || 0))
+      : 0;
+
+  const custoPorKm: number =
+    kmTotal > 0 && ganhoCalculado > 0
+      ? lucroPreview / kmTotal
+      : 0;
+
   function addRide(): void {
     if (!ride.valor) return;
     setForm((prev) => ({ ...prev, rides: [...prev.rides, ride] }));
@@ -107,7 +117,6 @@ function AddDay({ onSave }: AddDayProps) {
 
   function handleSubmit(e: FormEvent<HTMLFormElement>): void {
     e.preventDefault();
-
     const newDay: Day = {
       ...form,
       id: crypto.randomUUID(),
@@ -115,9 +124,7 @@ function AddDay({ onSave }: AddDayProps) {
       ganho: String(ganhoCalculado),
       operadorPercent: costs.operadorPercent || 0,
     };
-
     onSave(newDay);
-
     setForm({
       date: '',
       uberTotal: '',
@@ -127,6 +134,8 @@ function AddDay({ onSave }: AddDayProps) {
       gorjetaDinheiro: '',
       combustivel: '',
       horas: '',
+      kmInicio: '',
+      kmFim: '',
       rides: [],
     });
   }
@@ -150,18 +159,12 @@ function AddDay({ onSave }: AddDayProps) {
 
       <section style={styles.card}>
         <div style={styles.modeSwitch}>
-          <button
-            type="button"
-            onClick={() => setMode('total')}
-            style={{ ...styles.modeButton, ...(mode === 'total' ? styles.modeActive : {}) }}
-          >
+          <button type="button" onClick={() => setMode('total')}
+            style={{ ...styles.modeButton, ...(mode === 'total' ? styles.modeActive : {}) }}>
             Total do dia
           </button>
-          <button
-            type="button"
-            onClick={() => setMode('rides')}
-            style={{ ...styles.modeButton, ...(mode === 'rides' ? styles.modeActive : {}) }}
-          >
+          <button type="button" onClick={() => setMode('rides')}
+            style={{ ...styles.modeButton, ...(mode === 'rides' ? styles.modeActive : {}) }}>
             Por corrida
           </button>
         </div>
@@ -172,18 +175,12 @@ function AddDay({ onSave }: AddDayProps) {
 
           {mode === 'total' && (
             <>
-              {/* Ganho Total — calculado automaticamente */}
               <label style={styles.label}>
                 Ganho Total
                 <div style={styles.ganhoWrapper}>
                   <span style={styles.ganhoEuro}>€</span>
-                  <input
-                    type="number"
-                    value={ganhoCalculado > 0 ? ganhoCalculado.toFixed(2) : ''}
-                    readOnly
-                    style={styles.ganhoInput}
-                    placeholder="Calculado automaticamente"
-                  />
+                  <input type="number" value={ganhoCalculado > 0 ? ganhoCalculado.toFixed(2) : ''}
+                    readOnly style={styles.ganhoInput} placeholder="Calculado automaticamente" />
                   <span style={styles.ganhoAuto}>auto</span>
                 </div>
               </label>
@@ -193,7 +190,6 @@ function AddDay({ onSave }: AddDayProps) {
               <Input label="Total Bolt" type="number" value={form.boltTotal}
                 onChange={(value) => setForm({ ...form, boltTotal: value })} />
 
-              {/* Secção de Gorjetas */}
               <div style={styles.gorjetasBox}>
                 <p style={styles.gorjetasTitle}>🎁 Gorjetas</p>
                 <div style={styles.gorjetasGrid}>
@@ -217,25 +213,16 @@ function AddDay({ onSave }: AddDayProps) {
             <div style={styles.ridesBox}>
               <h3 style={styles.boxTitle}>Adicionar corrida</h3>
               <div style={styles.rideRow}>
-                <select
-                  value={ride.plataforma}
+                <select value={ride.plataforma}
                   onChange={(e: ChangeEvent<HTMLSelectElement>) =>
-                    setRide({ ...ride, plataforma: e.target.value as 'uber' | 'bolt' })
-                  }
-                  style={styles.select}
-                >
+                    setRide({ ...ride, plataforma: e.target.value as 'uber' | 'bolt' })}
+                  style={styles.select}>
                   <option value="uber">Uber</option>
                   <option value="bolt">Bolt</option>
                 </select>
-                <input
-                  type="number"
-                  placeholder="Valor da corrida"
-                  value={ride.valor}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                    setRide({ ...ride, valor: e.target.value })
-                  }
-                  style={styles.input}
-                />
+                <input type="number" placeholder="Valor da corrida" value={ride.valor}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => setRide({ ...ride, valor: e.target.value })}
+                  style={styles.input} />
                 <button type="button" onClick={addRide} style={styles.addButton}>+</button>
               </div>
               {form.rides.length > 0 && (
@@ -244,11 +231,7 @@ function AddDay({ onSave }: AddDayProps) {
                     <div key={index} style={styles.rideItem}>
                       <span>{item.plataforma.toUpperCase()}</span>
                       <strong>€ {Number(item.valor).toFixed(2)}</strong>
-                      <button
-                        type="button"
-                        onClick={() => removeRide(index)}
-                        style={styles.removeButton}
-                      >
+                      <button type="button" onClick={() => removeRide(index)} style={styles.removeButton}>
                         Remover
                       </button>
                     </div>
@@ -257,6 +240,28 @@ function AddDay({ onSave }: AddDayProps) {
               )}
             </div>
           )}
+
+          {/* Quilómetros */}
+          <div style={styles.kmBox}>
+            <p style={styles.kmTitle}>🗺️ Quilómetros</p>
+            <div style={styles.kmGrid}>
+              <Input label="Km início" type="number" value={form.kmInicio}
+                placeholder="Ex: 45230"
+                onChange={(value) => setForm({ ...form, kmInicio: value })} />
+              <Input label="Km fim" type="number" value={form.kmFim}
+                placeholder="Ex: 45410"
+                onChange={(value) => setForm({ ...form, kmFim: value })} />
+              <label style={styles.label}>
+                Km percorridos
+                <div style={styles.ganhoWrapper}>
+                  <span style={styles.ganhoEuro}>km</span>
+                  <input type="number" value={kmTotal > 0 ? kmTotal : ''}
+                    readOnly style={styles.ganhoInput} placeholder="Auto" />
+                  <span style={styles.ganhoAuto}>auto</span>
+                </div>
+              </label>
+            </div>
+          </div>
 
           <Input label="Combustível" type="number" value={form.combustivel}
             onChange={(value) => setForm({ ...form, combustivel: value })} />
@@ -287,6 +292,20 @@ function AddDay({ onSave }: AddDayProps) {
                   <span style={{ color: '#dc2626' }}>-€{operadorPreview.toFixed(2)}</span>
                 </div>
               )}
+              {kmTotal > 0 && (
+                <div style={styles.previewRow}>
+                  <span>Km percorridos</span>
+                  <span style={{ color: '#6366f1' }}>{kmTotal} km</span>
+                </div>
+              )}
+              {custoPorKm !== 0 && (
+                <div style={styles.previewRow}>
+                  <span>Lucro por km</span>
+                  <span style={{ color: custoPorKm >= 0 ? '#16a34a' : '#dc2626' }}>
+                    €{custoPorKm.toFixed(2)}/km
+                  </span>
+                </div>
+              )}
               <div style={{ ...styles.previewRow, borderTop: '1px solid #e2e8f0', paddingTop: '10px', marginTop: '6px' }}>
                 <strong>Lucro real</strong>
                 <strong style={{ color: lucroPreview >= 0 ? '#16a34a' : '#dc2626' }}>
@@ -303,7 +322,6 @@ function AddDay({ onSave }: AddDayProps) {
   );
 }
 
-// ── Estilos ───────────────────────────────────────────────────────────────────
 const styles: Styles = {
   header: { marginBottom: '24px' },
   eyebrow: { margin: 0, fontSize: '12px', fontWeight: 900, letterSpacing: '0.14em', color: '#6366f1', textTransform: 'uppercase' },
@@ -328,6 +346,9 @@ const styles: Styles = {
   gorjetasTitle: { margin: '0 0 16px', fontWeight: 900, fontSize: '15px', color: '#92400e' },
   gorjetasGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px' },
   gorjetasTotal: { margin: '14px 0 0', fontSize: '14px', color: '#92400e', fontWeight: 700 },
+  kmBox: { gridColumn: '1 / -1', padding: '20px', borderRadius: '20px', background: '#eef2ff', border: '1px solid #c7d2fe' },
+  kmTitle: { margin: '0 0 16px', fontWeight: 900, fontSize: '15px', color: '#3730a3' },
+  kmGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px' },
   select: { padding: '14px 16px', borderRadius: '14px', border: '1px solid #cbd5e1', fontSize: '15px' },
   ridesBox: { gridColumn: '1 / -1', padding: '20px', borderRadius: '20px', background: '#f8fafc', border: '1px solid #e2e8f0' },
   boxTitle: { marginTop: 0 },

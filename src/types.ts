@@ -16,6 +16,8 @@ export interface Day {
   combustivel: string;
   operadorPercent: string | number;
   horas: string;
+  kmInicio?: string;
+  kmFim?: string;
   rides: Ride[];
 }
 

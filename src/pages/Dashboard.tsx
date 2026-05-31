@@ -1,4 +1,4 @@
-import { useContext, useEffect, useMemo, useState, CSSProperties } from 'react';
+import { useContext, useEffect, useMemo, useState, CSSProperties, ChangeEvent } from 'react';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -51,12 +51,14 @@ interface DayCalc {
   despesas: number;
   lucro: number;
   horas: number;
+  km: number;
 }
 
 interface DayCalcSimple {
   ganho: number;
   lucro: number;
   horas: number;
+  km: number;
 }
 
 interface WeekData {
@@ -127,7 +129,10 @@ function calcularDia(day: Day): DayCalcSimple {
   const operador = ganho * ((Number(day.operadorPercent) || 0) / 100);
   const lucro = ganho - combustivel - operador;
   const horas = Number(day.horas) || 0;
-  return { ganho, lucro, horas };
+  const km = day.kmInicio && day.kmFim
+    ? Math.max(0, (Number(day.kmFim) || 0) - (Number(day.kmInicio) || 0))
+    : 0;
+  return { ganho, lucro, horas, km };
 }
 
 function calcular(day: Day): DayCalc {
@@ -144,18 +149,18 @@ function calcular(day: Day): DayCalc {
     uber = Number(day.uberTotal) || 0;
     bolt = Number(day.boltTotal) || 0;
   }
-
-  // Gorjetas — somadas separadamente para visibilidade
   const gorjetas =
     (Number(day.gorjetaUber) || 0) +
     (Number(day.gorjetaBolt) || 0) +
     (Number(day.gorjetaDinheiro) || 0);
-
   const combustivel = Number(day.combustivel) || 0;
   const operador = ganho * ((Number(day.operadorPercent) || 0) / 100);
   const despesas = combustivel + operador;
   const lucro = ganho - despesas;
-  return { ganho, uber, bolt, gorjetas, combustivel, operador, despesas, lucro, horas: Number(day.horas) || 0 };
+  const km = day.kmInicio && day.kmFim
+    ? Math.max(0, (Number(day.kmFim) || 0) - (Number(day.kmInicio) || 0))
+    : 0;
+  return { ganho, uber, bolt, gorjetas, combustivel, operador, despesas, lucro, horas: Number(day.horas) || 0, km };
 }
 
 // ── Componentes auxiliares ────────────────────────────────────────────────────
@@ -186,6 +191,24 @@ function Dashboard({ days, isDemo }: DashboardProps) {
   const [insight, setInsight] = useState<string>('');
   const isMobile = useIsMobile();
 
+  // Objetivo semanal — guardado no localStorage
+  const [objetivoSemanal, setObjetivoSemanal] = useState<number>(() => {
+    const saved = localStorage.getItem('driver-objetivo-semanal');
+    return saved ? Number(saved) : 0;
+  });
+  const [editandoObjetivo, setEditandoObjetivo] = useState(false);
+  const [objetivoInput, setObjetivoInput] = useState('');
+
+  function guardarObjetivo(): void {
+    const valor = Number(objetivoInput);
+    if (valor > 0) {
+      setObjetivoSemanal(valor);
+      localStorage.setItem('driver-objetivo-semanal', String(valor));
+    }
+    setEditandoObjetivo(false);
+    setObjetivoInput('');
+  }
+
   const custoSemanal = calcularCustoSemanal(costs);
   const diasSemanaActual = useMemo(() => getSemanaActual(days), [days]);
 
@@ -196,9 +219,10 @@ function Dashboard({ days, isDemo }: DashboardProps) {
         acc.lucro += d.lucro;
         acc.ganho += d.ganho;
         acc.horas += d.horas;
+        acc.km += d.km;
         return acc;
       },
-      { lucro: 0, ganho: 0, horas: 0 },
+      { lucro: 0, ganho: 0, horas: 0, km: 0 },
     );
   }, [diasSemanaActual]);
 
@@ -206,47 +230,80 @@ function Dashboard({ days, isDemo }: DashboardProps) {
   const temCustos = custoSemanal > 0;
   const temDadosSemana = diasSemanaActual.length > 0;
   const mediaHoraSemana = semanaActual.horas > 0 ? semanaActual.lucro / semanaActual.horas : 0;
+  const hojeIndex = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1;
+  const diasRestantes = 6 - hojeIndex;
 
+  // ── Análise Break-Even ───────────────────────────────────────────────────
   function gerarAnaliseBreakEven(): BreakEvenAnalysis | null {
-    if (!temCustos) return null;
-    if (!temDadosSemana) {
-      return {
-        tipo: 'info',
-        linhas: [
-          `📋 Os teus custos fixos semanais são €${custoSemanal.toFixed(2)}.`,
-          `Ainda não tens dias registados esta semana. Adiciona o primeiro dia para ver a análise.`,
-        ],
-      };
-    }
-    const hojeIndex = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1;
-    const diasRestantes = 6 - hojeIndex;
+    if (!temCustos && objetivoSemanal === 0) return null;
+
     const linhas: string[] = [];
-    if (margem >= 0) {
-      const percentagem = Math.round((semanaActual.lucro / custoSemanal) * 100);
-      linhas.push(`✅ Estás acima do break-even esta semana.`);
-      linhas.push(`Lucro: €${semanaActual.lucro.toFixed(2)} · Custos: €${custoSemanal.toFixed(2)} · Margem: +€${margem.toFixed(2)} (${percentagem}%)`);
-      if (mediaHoraSemana > 0) {
-        linhas.push(`💡 Estás a ganhar €${mediaHoraSemana.toFixed(2)}/h esta semana. ${mediaHoraSemana >= 10 ? 'Boa rentabilidade.' : 'Considera optimizar os horários de pico.'}`);
-      }
-    } else {
-      const falta = Math.abs(margem);
-      linhas.push(`🚨 Ainda faltam €${falta.toFixed(2)} para cobrir os custos fixos desta semana.`);
-      linhas.push(`Lucro actual: €${semanaActual.lucro.toFixed(2)} · Necessário: €${custoSemanal.toFixed(2)}`);
-      if (diasRestantes > 0 && semanaActual.horas > 0) {
-        const lucroMediaDia = semanaActual.lucro / diasSemanaActual.length;
-        const diasNecessarios = Math.ceil(falta / lucroMediaDia);
-        const horasNecessarias = Math.ceil(falta / mediaHoraSemana);
-        if (diasNecessarios <= diasRestantes) {
-          linhas.push(`📅 Ao teu ritmo actual (€${lucroMediaDia.toFixed(2)}/dia), precisas de mais ${diasNecessarios} dia${diasNecessarios > 1 ? 's' : ''} de trabalho para cobrir os custos.`);
-        } else {
-          linhas.push(`⚠️ Ao ritmo actual não consegues cobrir os custos esta semana. Considera aumentar as horas nos dias de maior procura.`);
+
+    // Objetivo semanal
+    if (objetivoSemanal > 0 && temDadosSemana) {
+      const faltaObjetivo = objetivoSemanal - semanaActual.ganho;
+      const progressoPercent = Math.round((semanaActual.ganho / objetivoSemanal) * 100);
+
+      if (faltaObjetivo <= 0) {
+        linhas.push(`🎯 Objetivo semanal atingido! Faturaste €${semanaActual.ganho.toFixed(2)} de €${objetivoSemanal.toFixed(2)} (${progressoPercent}%).`);
+      } else {
+        linhas.push(`🎯 Objetivo: €${objetivoSemanal.toFixed(2)} · Atual: €${semanaActual.ganho.toFixed(2)} · Falta: €${faltaObjetivo.toFixed(2)} (${progressoPercent}%)`);
+        if (diasRestantes > 0 && semanaActual.horas > 0) {
+          const ganhoMediaDia = semanaActual.ganho / diasSemanaActual.length;
+          const diasNecessarios = Math.ceil(faltaObjetivo / ganhoMediaDia);
+          const mediaGanhoHora = semanaActual.horas > 0 ? semanaActual.ganho / semanaActual.horas : 0;
+          const horasNecessarias = mediaGanhoHora > 0 ? Math.ceil(faltaObjetivo / mediaGanhoHora) : 0;
+          if (diasNecessarios <= diasRestantes) {
+            linhas.push(`📅 Ao teu ritmo (€${ganhoMediaDia.toFixed(2)}/dia), precisas de mais ${diasNecessarios} dia${diasNecessarios > 1 ? 's' : ''} para atingir o objetivo.`);
+          } else {
+            linhas.push(`⚠️ Ao ritmo actual não consegues atingir o objetivo esta semana. Aumenta as horas nos dias restantes.`);
+          }
+          if (horasNecessarias > 0) {
+            linhas.push(`⏱ Precisas de mais ${horasNecessarias}h de trabalho a €${(semanaActual.ganho / semanaActual.horas).toFixed(2)}/h para atingir o objetivo.`);
+          }
+        } else if (!temDadosSemana) {
+          linhas.push(`Adiciona o primeiro dia da semana para ver a análise de progresso.`);
         }
-        linhas.push(`⏱ Precisas de mais ${horasNecessarias}h de trabalho a €${mediaHoraSemana.toFixed(2)}/h para fechar o break-even.`);
-      } else if (diasRestantes === 0) {
-        linhas.push(`📉 A semana terminou abaixo do break-even. Na próxima semana foca os primeiros dias para garantir a cobertura dos custos.`);
       }
+    } else if (objetivoSemanal > 0 && !temDadosSemana) {
+      linhas.push(`🎯 Objetivo desta semana: €${objetivoSemanal.toFixed(2)}. Adiciona o primeiro dia para acompanhar o progresso.`);
     }
-    return { tipo: margem >= 0 ? 'positivo' : 'negativo', linhas };
+
+    // Break-even
+    if (temCustos && temDadosSemana) {
+      if (margem >= 0) {
+        const percentagem = Math.round((semanaActual.lucro / custoSemanal) * 100);
+        linhas.push(`✅ Break-even atingido. Lucro: €${semanaActual.lucro.toFixed(2)} · Custos: €${custoSemanal.toFixed(2)} · Margem: +€${margem.toFixed(2)} (${percentagem}%)`);
+        if (mediaHoraSemana > 0) {
+          linhas.push(`💡 €${mediaHoraSemana.toFixed(2)}/h esta semana. ${mediaHoraSemana >= 10 ? 'Boa rentabilidade.' : 'Considera optimizar os horários de pico.'}`);
+        }
+      } else {
+        const falta = Math.abs(margem);
+        linhas.push(`🚨 Faltam €${falta.toFixed(2)} para cobrir os custos fixos.`);
+        if (diasRestantes > 0 && semanaActual.horas > 0) {
+          const horasNecessarias = Math.ceil(falta / mediaHoraSemana);
+          linhas.push(`⏱ Precisas de mais ${horasNecessarias}h a €${mediaHoraSemana.toFixed(2)}/h para fechar o break-even.`);
+        }
+      }
+    } else if (temCustos && !temDadosSemana) {
+      linhas.push(`📋 Custos fixos semanais: €${custoSemanal.toFixed(2)}. Adiciona dias para ver a análise.`);
+    }
+
+    // Km
+    if (semanaActual.km > 0) {
+      const lucroKm = semanaActual.km > 0 ? semanaActual.lucro / semanaActual.km : 0;
+      linhas.push(`🗺️ ${semanaActual.km} km percorridos esta semana · €${lucroKm.toFixed(2)}/km de lucro.`);
+    }
+
+    if (linhas.length === 0) return null;
+
+    const tipo = margem >= 0 && (objetivoSemanal === 0 || semanaActual.ganho >= objetivoSemanal)
+      ? 'positivo'
+      : linhas.some(l => l.includes('🚨'))
+      ? 'negativo'
+      : 'info';
+
+    return { tipo, linhas };
   }
 
   const analiseBreakEven = gerarAnaliseBreakEven();
@@ -272,9 +329,10 @@ function Dashboard({ days, isDemo }: DashboardProps) {
       acc.gorjetas += d.gorjetas;
       acc.combustivel += d.combustivel; acc.operador += d.operador;
       acc.despesas += d.despesas; acc.lucro += d.lucro; acc.horas += d.horas;
+      acc.km += d.km;
       return acc;
     },
-    { ganho: 0, uber: 0, bolt: 0, gorjetas: 0, combustivel: 0, operador: 0, despesas: 0, lucro: 0, horas: 0 },
+    { ganho: 0, uber: 0, bolt: 0, gorjetas: 0, combustivel: 0, operador: 0, despesas: 0, lucro: 0, horas: 0, km: 0 },
   );
 
   const mediaHora = totals.horas > 0 ? totals.lucro / totals.horas : 0;
@@ -294,9 +352,7 @@ function Dashboard({ days, isDemo }: DashboardProps) {
       weeks[key].despesas += d.despesas; weeks[key].uber += d.uber;
       weeks[key].bolt += d.bolt; weeks[key].dias += 1;
     });
-
     const fmt = (d: Date) => `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`;
-
     return Object.entries(weeks)
       .sort(([a], [b]) => new Date(a).getTime() - new Date(b).getTime())
       .map(([monday, data]) => {
@@ -360,7 +416,9 @@ function Dashboard({ days, isDemo }: DashboardProps) {
     if (totals.gorjetas > 0) texto += `Total gorjetas: €${totals.gorjetas.toFixed(2)}\n`;
     texto += `Despesas totais: €${totals.despesas.toFixed(2)}\n`;
     texto += `Média por hora: €${mediaHora.toFixed(2)}\n`;
+    if (totals.km > 0) texto += `Km totais: ${totals.km} km\n`;
     if (temCustos) texto += `Custo fixo semanal: €${custoSemanal.toFixed(2)}\n`;
+    if (objetivoSemanal > 0) texto += `Objetivo semanal: €${objetivoSemanal.toFixed(2)}\n`;
     texto += '\n';
     if (totals.lucro < 0) {
       texto += '🚨 O período está negativo. Prioridade: rever combustível, percentagem do operador e horários de trabalho.\n\n';
@@ -392,6 +450,11 @@ function Dashboard({ days, isDemo }: DashboardProps) {
     info: { background: '#eef2ff', border: '1px solid #c7d2fe' },
   };
 
+  // Progresso do objetivo
+  const progressoObjetivo = objetivoSemanal > 0
+    ? Math.min(100, Math.round((semanaActual.ganho / objetivoSemanal) * 100))
+    : 0;
+
   return (
     <div>
       <header style={s.header}>
@@ -409,6 +472,58 @@ function Dashboard({ days, isDemo }: DashboardProps) {
         </button>
       </header>
 
+      {/* ── Objetivo Semanal ── */}
+      <section style={s.objetivoCard}>
+        <div style={s.objetivoHeader}>
+          <div>
+            <p style={s.objetivoLabel}>🎯 Objetivo desta semana</p>
+            {objetivoSemanal > 0 ? (
+              <p style={s.objetivoValor}>€{objetivoSemanal.toFixed(2)}</p>
+            ) : (
+              <p style={s.objetivoVazio}>Não definido</p>
+            )}
+          </div>
+          <button
+            style={s.objetivoBtn}
+            onClick={() => { setEditandoObjetivo(true); setObjetivoInput(objetivoSemanal > 0 ? String(objetivoSemanal) : ''); }}
+          >
+            {objetivoSemanal > 0 ? '✏️ Editar' : '+ Definir'}
+          </button>
+        </div>
+
+        {editandoObjetivo && (
+          <div style={s.objetivoForm}>
+            <input
+              type="number"
+              value={objetivoInput}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setObjetivoInput(e.target.value)}
+              placeholder="Ex: 450"
+              style={s.objetivoInput}
+              autoFocus
+            />
+            <button style={s.objetivoGuardar} onClick={guardarObjetivo}>Guardar</button>
+            <button style={s.objetivoCancelar} onClick={() => setEditandoObjetivo(false)}>Cancelar</button>
+          </div>
+        )}
+
+        {objetivoSemanal > 0 && temDadosSemana && (
+          <>
+            <div style={s.progressoBar}>
+              <div style={{ ...s.progressoFill, width: `${progressoObjetivo}%`, background: progressoObjetivo >= 100 ? '#16a34a' : progressoObjetivo >= 70 ? '#f59e0b' : '#4f46e5' }} />
+            </div>
+            <div style={s.progressoInfo}>
+              <span style={{ color: '#64748b', fontSize: '13px', fontWeight: 700 }}>
+                €{semanaActual.ganho.toFixed(2)} / €{objetivoSemanal.toFixed(2)}
+              </span>
+              <span style={{ color: progressoObjetivo >= 100 ? '#16a34a' : '#4f46e5', fontSize: '13px', fontWeight: 900 }}>
+                {progressoObjetivo}%
+              </span>
+            </div>
+          </>
+        )}
+      </section>
+
+      {/* Análise Break-Even + Objetivo */}
       {analiseBreakEven && (
         <section style={{ ...s.breakEvenBox, ...breakEvenColors[analiseBreakEven.tipo] }}>
           <p style={s.breakEvenTitulo}>
@@ -418,9 +533,9 @@ function Dashboard({ days, isDemo }: DashboardProps) {
           {analiseBreakEven.linhas.map((linha, i) => (
             <p key={i} style={s.breakEvenLinha}>{linha}</p>
           ))}
-          {!temCustos && (
+          {!temCustos && objetivoSemanal === 0 && (
             <p style={{ ...s.breakEvenLinha, color: '#6366f1', marginTop: '8px' }}>
-              👉 Define os teus custos em <strong>Custos Fixos</strong> para activar esta análise.
+              👉 Define o teu <strong>objetivo semanal</strong> acima e os <strong>Custos Fixos</strong> para activar a análise completa.
             </p>
           )}
         </section>
@@ -449,6 +564,29 @@ function Dashboard({ days, isDemo }: DashboardProps) {
         <MiniCard title="Combustível" value={totals.combustivel} color="#f97316" isMobile={isMobile} />
         <MiniCard title="Operador" value={totals.operador} color="#eab308" isMobile={isMobile} />
       </section>
+
+      {totals.km > 0 && (
+        <section style={s.kmCard}>
+          <div style={s.kmRow}>
+            <div>
+              <p style={s.kmLabel}>🗺️ Km totais</p>
+              <p style={s.kmValor}>{totals.km} km</p>
+            </div>
+            <div>
+              <p style={s.kmLabel}>Lucro / km</p>
+              <p style={{ ...s.kmValor, color: '#8b5cf6' }}>
+                €{totals.km > 0 ? (totals.lucro / totals.km).toFixed(2) : '0.00'}/km
+              </p>
+            </div>
+            <div>
+              <p style={s.kmLabel}>Km / hora</p>
+              <p style={{ ...s.kmValor, color: '#3b82f6' }}>
+                {totals.horas > 0 ? Math.round(totals.km / totals.horas) : 0} km/h
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
 
       {insight && <section style={s.insightBox}>{insight}</section>}
 
@@ -521,6 +659,19 @@ const desktopStyles: Styles = {
   title: { margin: '8px 0', fontSize: '42px', fontWeight: 900, letterSpacing: '-0.04em' },
   subtitle: { margin: 0, color: '#64748b', fontSize: '16px', maxWidth: '720px', lineHeight: 1.6 },
   aiButton: { padding: '14px 18px', borderRadius: '16px', border: 'none', background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', color: '#fff', fontWeight: 900, cursor: 'pointer', boxShadow: '0 16px 34px rgba(79,70,229,0.25)', whiteSpace: 'nowrap' },
+  objetivoCard: { padding: '20px 24px', borderRadius: '20px', background: '#ffffff', border: '1px solid #e5e7eb', boxShadow: '0 8px 24px rgba(15,23,42,0.06)', marginBottom: '16px' },
+  objetivoHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' },
+  objetivoLabel: { margin: '0 0 4px', fontSize: '13px', fontWeight: 800, color: '#64748b' },
+  objetivoValor: { margin: 0, fontSize: '28px', fontWeight: 900, color: '#0f172a' },
+  objetivoVazio: { margin: 0, fontSize: '15px', color: '#94a3b8', fontWeight: 600 },
+  objetivoBtn: { padding: '10px 16px', borderRadius: '12px', border: '1px solid #c7d2fe', background: '#eef2ff', color: '#4f46e5', fontWeight: 900, cursor: 'pointer', fontSize: '13px' },
+  objetivoForm: { display: 'flex', gap: '10px', alignItems: 'center', marginTop: '12px' },
+  objetivoInput: { padding: '10px 14px', borderRadius: '12px', border: '1px solid #c7d2fe', fontSize: '15px', outline: 'none', width: '140px' },
+  objetivoGuardar: { padding: '10px 16px', borderRadius: '12px', border: 'none', background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', color: '#fff', fontWeight: 900, cursor: 'pointer' },
+  objetivoCancelar: { padding: '10px 16px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#fff', color: '#475569', fontWeight: 800, cursor: 'pointer' },
+  progressoBar: { height: '8px', borderRadius: '999px', background: '#e2e8f0', overflow: 'hidden', marginBottom: '6px' },
+  progressoFill: { height: '100%', borderRadius: '999px', transition: 'width 0.4s ease' },
+  progressoInfo: { display: 'flex', justifyContent: 'space-between' },
   breakEvenBox: { padding: '20px 24px', borderRadius: '20px', marginBottom: '20px' },
   breakEvenTitulo: { margin: '0 0 10px', fontWeight: 900, fontSize: '15px', color: '#0f172a' },
   breakEvenCusto: { fontSize: '13px', fontWeight: 700, color: '#64748b' },
@@ -533,9 +684,13 @@ const desktopStyles: Styles = {
   kpiFeatured: { border: '1px solid rgba(79,70,229,0.35)', boxShadow: '0 22px 55px rgba(79,70,229,0.14)' },
   cardLabel: { margin: 0, color: '#64748b', fontSize: '14px', fontWeight: 800 },
   kpiValue: { margin: '18px 0 0', fontSize: '32px', letterSpacing: '-0.04em' },
-  miniGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '20px' },
+  miniGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '16px' },
   miniCard: { padding: '18px', borderRadius: '20px', background: '#ffffff', border: '1px solid #e5e7eb' },
   miniValue: { margin: '12px 0 0', fontSize: '24px' },
+  kmCard: { padding: '18px 24px', borderRadius: '20px', background: '#f8fafc', border: '1px solid #e2e8f0', marginBottom: '20px' },
+  kmRow: { display: 'flex', gap: '32px', flexWrap: 'wrap' },
+  kmLabel: { margin: '0 0 4px', fontSize: '12px', fontWeight: 800, color: '#64748b' },
+  kmValor: { margin: 0, fontSize: '22px', fontWeight: 900, color: '#0f172a' },
   insightBox: { whiteSpace: 'pre-line', padding: '22px', borderRadius: '22px', background: '#eef2ff', border: '1px solid #c7d2fe', color: '#1e1b4b', lineHeight: 1.7, marginBottom: '22px', fontWeight: 600 },
   chartCard: { padding: '26px', borderRadius: '28px', background: '#ffffff', border: '1px solid #e5e7eb', boxShadow: '0 22px 60px rgba(15,23,42,0.07)' },
   chartHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', gap: '16px' },
@@ -556,6 +711,8 @@ const mobileStyles: Styles = {
   header: { display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center', marginBottom: '16px' },
   title: { margin: '4px 0 0', fontSize: '26px', fontWeight: 900, letterSpacing: '-0.03em' },
   aiButton: { padding: '10px 12px', borderRadius: '12px', border: 'none', background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', color: '#fff', fontWeight: 900, cursor: 'pointer', fontSize: '13px', whiteSpace: 'nowrap', flexShrink: 0 },
+  objetivoCard: { padding: '16px', borderRadius: '18px', background: '#ffffff', border: '1px solid #e5e7eb', marginBottom: '12px' },
+  objetivoValor: { margin: 0, fontSize: '22px', fontWeight: 900, color: '#0f172a' },
   breakEvenBox: { padding: '16px', borderRadius: '18px', marginBottom: '16px' },
   breakEvenTitulo: { margin: '0 0 8px', fontWeight: 900, fontSize: '14px', color: '#0f172a' },
   breakEvenLinha: { margin: '4px 0 0', fontSize: '13px', lineHeight: 1.6, color: '#1e293b', fontWeight: 600 },
@@ -567,9 +724,12 @@ const mobileStyles: Styles = {
   kpiFeatured: { border: '1px solid rgba(79,70,229,0.35)', boxShadow: '0 12px 30px rgba(79,70,229,0.12)' },
   cardLabel: { margin: 0, color: '#64748b', fontSize: '12px', fontWeight: 800 },
   kpiValue: { margin: '10px 0 0', fontSize: '22px', letterSpacing: '-0.03em' },
-  miniGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' },
+  miniGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' },
   miniCard: { padding: '14px', borderRadius: '16px', background: '#ffffff', border: '1px solid #e5e7eb' },
   miniValue: { margin: '8px 0 0', fontSize: '18px' },
+  kmCard: { padding: '14px 16px', borderRadius: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', marginBottom: '16px' },
+  kmRow: { display: 'flex', gap: '20px', flexWrap: 'wrap' },
+  kmValor: { margin: 0, fontSize: '18px', fontWeight: 900, color: '#0f172a' },
   insightBox: { whiteSpace: 'pre-line', padding: '16px', borderRadius: '18px', background: '#eef2ff', border: '1px solid #c7d2fe', color: '#1e1b4b', lineHeight: 1.6, marginBottom: '16px', fontWeight: 600, fontSize: '13px' },
   chartCard: { padding: '18px', borderRadius: '22px', background: '#ffffff', border: '1px solid #e5e7eb', boxShadow: '0 8px 30px rgba(15,23,42,0.06)' },
   chartHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px', gap: '10px' },
