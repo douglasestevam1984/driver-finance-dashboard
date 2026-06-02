@@ -24,70 +24,37 @@ interface DashboardProps {
   days: Day[];
   isDemo?: boolean;
 }
-
 interface KpiCardProps {
-  title: string;
-  value: number;
-  color: string;
-  suffix?: string;
-  featured?: boolean;
-  isMobile: boolean;
+  title: string; value: number; color: string; suffix?: string; featured?: boolean; isMobile: boolean;
 }
-
 interface MiniCardProps {
-  title: string;
-  value: number;
-  color: string;
-  isMobile: boolean;
+  title: string; value: number; color: string; isMobile: boolean;
 }
-
 interface DayCalc {
-  ganho: number;
-  uber: number;
-  bolt: number;
-  gorjetas: number;
-  combustivel: number;
-  operador: number;
-  despesas: number;
-  lucro: number;
-  horas: number;
-  km: number;
+  ganho: number; uber: number; bolt: number; gorjetas: number;
+  combustivel: number; operador: number; despesas: number; lucro: number; horas: number; km: number;
 }
-
 interface DayCalcSimple {
-  ganho: number;
-  lucro: number;
-  horas: number;
-  km: number;
+  ganho: number; lucro: number; horas: number; km: number;
 }
-
 interface WeekData {
-  label: string;
-  labelFull: string;
-  ganho: number;
-  lucro: number;
-  despesas: number;
-  uber: number;
-  bolt: number;
-  dias: number;
+  label: string; labelFull: string; ganho: number; lucro: number;
+  despesas: number; uber: number; bolt: number; dias: number;
 }
-
 interface WeekAccumulator {
   [key: string]: Omit<WeekData, 'label' | 'labelFull'>;
 }
-
 interface BreakEvenAnalysis {
-  tipo: 'positivo' | 'negativo' | 'info';
-  linhas: string[];
+  tipo: 'positivo' | 'negativo' | 'info'; linhas: string[];
 }
-
 interface BreakEvenColors {
-  positivo: CSSProperties;
-  negativo: CSSProperties;
-  info: CSSProperties;
+  positivo: CSSProperties; negativo: CSSProperties; info: CSSProperties;
+}
+interface MesOpcao {
+  key: string; // 'YYYY-MM'
+  label: string; // 'Junho 2026'
 }
 
-type Period = '7d' | '30d' | 'all';
 type Styles = Record<string, CSSProperties>;
 
 // ── Hooks ─────────────────────────────────────────────────────────────────────
@@ -101,7 +68,7 @@ function useIsMobile(): boolean {
   return isMobile;
 }
 
-// ── Funções utilitárias ───────────────────────────────────────────────────────
+// ── Utilitários ───────────────────────────────────────────────────────────────
 function getSemanaActual(days: Day[]): Day[] {
   const hoje = new Date();
   const diaSemana = hoje.getDay();
@@ -130,8 +97,7 @@ function calcularDia(day: Day): DayCalcSimple {
   const lucro = ganho - combustivel - operador;
   const horas = Number(day.horas) || 0;
   const km = day.kmInicio && day.kmFim
-    ? Math.max(0, (Number(day.kmFim) || 0) - (Number(day.kmInicio) || 0))
-    : 0;
+    ? Math.max(0, (Number(day.kmFim) || 0) - (Number(day.kmInicio) || 0)) : 0;
   return { ganho, lucro, horas, km };
 }
 
@@ -149,18 +115,21 @@ function calcular(day: Day): DayCalc {
     uber = Number(day.uberTotal) || 0;
     bolt = Number(day.boltTotal) || 0;
   }
-  const gorjetas =
-    (Number(day.gorjetaUber) || 0) +
-    (Number(day.gorjetaBolt) || 0) +
-    (Number(day.gorjetaDinheiro) || 0);
+  const gorjetas = (Number(day.gorjetaUber) || 0) + (Number(day.gorjetaBolt) || 0) + (Number(day.gorjetaDinheiro) || 0);
   const combustivel = Number(day.combustivel) || 0;
   const operador = ganho * ((Number(day.operadorPercent) || 0) / 100);
   const despesas = combustivel + operador;
   const lucro = ganho - despesas;
   const km = day.kmInicio && day.kmFim
-    ? Math.max(0, (Number(day.kmFim) || 0) - (Number(day.kmInicio) || 0))
-    : 0;
+    ? Math.max(0, (Number(day.kmFim) || 0) - (Number(day.kmInicio) || 0)) : 0;
   return { ganho, uber, bolt, gorjetas, combustivel, operador, despesas, lucro, horas: Number(day.horas) || 0, km };
+}
+
+// Gera label do mês em português
+function labelMes(ano: number, mes: number): string {
+  const meses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+  return `${meses[mes]} ${ano}`;
 }
 
 // ── Componentes auxiliares ────────────────────────────────────────────────────
@@ -173,7 +142,6 @@ function KpiCard({ title, value, color, suffix = '', featured, isMobile }: KpiCa
     </article>
   );
 }
-
 function MiniCard({ title, value, color, isMobile }: MiniCardProps) {
   const s = isMobile ? mobileStyles : desktopStyles;
   return (
@@ -184,14 +152,13 @@ function MiniCard({ title, value, color, isMobile }: MiniCardProps) {
   );
 }
 
-// ── Dashboard principal ───────────────────────────────────────────────────────
+// ── Dashboard ─────────────────────────────────────────────────────────────────
 function Dashboard({ days, isDemo }: DashboardProps) {
   const { costs } = useContext(AppContext);
-  const [period, setPeriod] = useState<Period>('all');
   const [insight, setInsight] = useState<string>('');
   const isMobile = useIsMobile();
 
-  // Objetivo semanal — guardado no localStorage
+  // Objetivo semanal
   const [objetivoSemanal, setObjetivoSemanal] = useState<number>(() => {
     const saved = localStorage.getItem('driver-objetivo-semanal');
     return saved ? Number(saved) : 0;
@@ -209,17 +176,55 @@ function Dashboard({ days, isDemo }: DashboardProps) {
     setObjetivoInput('');
   }
 
+  // ── Navegação por mês ─────────────────────────────────────────────────────
+  // Extrai todos os meses com dados, ordenados do mais recente para o mais antigo
+  const mesesDisponiveis = useMemo((): MesOpcao[] => {
+    const set = new Set<string>();
+    days.forEach((d) => {
+      if (!d.date) return;
+      const date = new Date(d.date);
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      set.add(key);
+    });
+    // Adiciona sempre o mês actual mesmo sem dados
+    const hoje = new Date();
+    const keyHoje = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
+    set.add(keyHoje);
+
+    return Array.from(set)
+      .sort((a, b) => b.localeCompare(a))
+      .map((key) => {
+        const [ano, mes] = key.split('-').map(Number);
+        return { key, label: labelMes(ano, mes - 1) };
+      });
+  }, [days]);
+
+  // Mês seleccionado — por defeito o mês actual
+  const [mesSelecionado, setMesSelecionado] = useState<string>(() => {
+    const hoje = new Date();
+    return `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
+  });
+
+  // Dias filtrados pelo mês seleccionado
+  const filteredDays = useMemo(() => {
+    return days
+      .filter((day) => {
+        if (!day.date) return false;
+        const date = new Date(day.date);
+        const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        return key === mesSelecionado;
+      })
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }, [days, mesSelecionado]);
+
+  // ── Semana actual ─────────────────────────────────────────────────────────
   const custoSemanal = calcularCustoSemanal(costs);
   const diasSemanaActual = useMemo(() => getSemanaActual(days), [days]);
-
   const semanaActual = useMemo(() => {
     return diasSemanaActual.reduce(
       (acc, day) => {
         const d = calcularDia(day);
-        acc.lucro += d.lucro;
-        acc.ganho += d.ganho;
-        acc.horas += d.horas;
-        acc.km += d.km;
+        acc.lucro += d.lucro; acc.ganho += d.ganho; acc.horas += d.horas; acc.km += d.km;
         return acc;
       },
       { lucro: 0, ganho: 0, horas: 0, km: 0 },
@@ -233,110 +238,21 @@ function Dashboard({ days, isDemo }: DashboardProps) {
   const hojeIndex = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1;
   const diasRestantes = 6 - hojeIndex;
 
-  // ── Análise Break-Even ───────────────────────────────────────────────────
-  function gerarAnaliseBreakEven(): BreakEvenAnalysis | null {
-    if (!temCustos && objetivoSemanal === 0) return null;
-
-    const linhas: string[] = [];
-
-    // Objetivo semanal
-    if (objetivoSemanal > 0 && temDadosSemana) {
-      const faltaObjetivo = objetivoSemanal - semanaActual.ganho;
-      const progressoPercent = Math.round((semanaActual.ganho / objetivoSemanal) * 100);
-
-      if (faltaObjetivo <= 0) {
-        linhas.push(`🎯 Objetivo semanal atingido! Faturaste €${semanaActual.ganho.toFixed(2)} de €${objetivoSemanal.toFixed(2)} (${progressoPercent}%).`);
-      } else {
-        linhas.push(`🎯 Objetivo: €${objetivoSemanal.toFixed(2)} · Atual: €${semanaActual.ganho.toFixed(2)} · Falta: €${faltaObjetivo.toFixed(2)} (${progressoPercent}%)`);
-        if (diasRestantes > 0 && semanaActual.horas > 0) {
-          const ganhoMediaDia = semanaActual.ganho / diasSemanaActual.length;
-          const diasNecessarios = Math.ceil(faltaObjetivo / ganhoMediaDia);
-          const mediaGanhoHora = semanaActual.horas > 0 ? semanaActual.ganho / semanaActual.horas : 0;
-          const horasNecessarias = mediaGanhoHora > 0 ? Math.ceil(faltaObjetivo / mediaGanhoHora) : 0;
-          if (diasNecessarios <= diasRestantes) {
-            linhas.push(`📅 Ao teu ritmo (€${ganhoMediaDia.toFixed(2)}/dia), precisas de mais ${diasNecessarios} dia${diasNecessarios > 1 ? 's' : ''} para atingir o objetivo.`);
-          } else {
-            linhas.push(`⚠️ Ao ritmo actual não consegues atingir o objetivo esta semana. Aumenta as horas nos dias restantes.`);
-          }
-          if (horasNecessarias > 0) {
-            linhas.push(`⏱ Precisas de mais ${horasNecessarias}h de trabalho a €${(semanaActual.ganho / semanaActual.horas).toFixed(2)}/h para atingir o objetivo.`);
-          }
-        } else if (!temDadosSemana) {
-          linhas.push(`Adiciona o primeiro dia da semana para ver a análise de progresso.`);
-        }
-      }
-    } else if (objetivoSemanal > 0 && !temDadosSemana) {
-      linhas.push(`🎯 Objetivo desta semana: €${objetivoSemanal.toFixed(2)}. Adiciona o primeiro dia para acompanhar o progresso.`);
-    }
-
-    // Break-even
-    if (temCustos && temDadosSemana) {
-      if (margem >= 0) {
-        const percentagem = Math.round((semanaActual.lucro / custoSemanal) * 100);
-        linhas.push(`✅ Break-even atingido. Lucro: €${semanaActual.lucro.toFixed(2)} · Custos: €${custoSemanal.toFixed(2)} · Margem: +€${margem.toFixed(2)} (${percentagem}%)`);
-        if (mediaHoraSemana > 0) {
-          linhas.push(`💡 €${mediaHoraSemana.toFixed(2)}/h esta semana. ${mediaHoraSemana >= 10 ? 'Boa rentabilidade.' : 'Considera optimizar os horários de pico.'}`);
-        }
-      } else {
-        const falta = Math.abs(margem);
-        linhas.push(`🚨 Faltam €${falta.toFixed(2)} para cobrir os custos fixos.`);
-        if (diasRestantes > 0 && semanaActual.horas > 0) {
-          const horasNecessarias = Math.ceil(falta / mediaHoraSemana);
-          linhas.push(`⏱ Precisas de mais ${horasNecessarias}h a €${mediaHoraSemana.toFixed(2)}/h para fechar o break-even.`);
-        }
-      }
-    } else if (temCustos && !temDadosSemana) {
-      linhas.push(`📋 Custos fixos semanais: €${custoSemanal.toFixed(2)}. Adiciona dias para ver a análise.`);
-    }
-
-    // Km
-    if (semanaActual.km > 0) {
-      const lucroKm = semanaActual.km > 0 ? semanaActual.lucro / semanaActual.km : 0;
-      linhas.push(`🗺️ ${semanaActual.km} km percorridos esta semana · €${lucroKm.toFixed(2)}/km de lucro.`);
-    }
-
-    if (linhas.length === 0) return null;
-
-    const tipo = margem >= 0 && (objetivoSemanal === 0 || semanaActual.ganho >= objetivoSemanal)
-      ? 'positivo'
-      : linhas.some(l => l.includes('🚨'))
-      ? 'negativo'
-      : 'info';
-
-    return { tipo, linhas };
-  }
-
-  const analiseBreakEven = gerarAnaliseBreakEven();
-
-  const filteredDays = useMemo(() => {
-    const today = new Date();
-    return days
-      .filter((day) => {
-        if (!day.date) return false;
-        const date = new Date(day.date);
-        const diff = (today.getTime() - date.getTime()) / (1000 * 60 * 60 * 24);
-        if (period === '7d') return diff <= 7;
-        if (period === '30d') return diff <= 30;
-        return true;
-      })
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  }, [days, period]);
-
+  // ── Totais do mês seleccionado ────────────────────────────────────────────
   const totals = filteredDays.reduce(
     (acc, day) => {
       const d = calcular(day);
       acc.ganho += d.ganho; acc.uber += d.uber; acc.bolt += d.bolt;
-      acc.gorjetas += d.gorjetas;
-      acc.combustivel += d.combustivel; acc.operador += d.operador;
-      acc.despesas += d.despesas; acc.lucro += d.lucro; acc.horas += d.horas;
-      acc.km += d.km;
+      acc.gorjetas += d.gorjetas; acc.combustivel += d.combustivel;
+      acc.operador += d.operador; acc.despesas += d.despesas;
+      acc.lucro += d.lucro; acc.horas += d.horas; acc.km += d.km;
       return acc;
     },
     { ganho: 0, uber: 0, bolt: 0, gorjetas: 0, combustivel: 0, operador: 0, despesas: 0, lucro: 0, horas: 0, km: 0 },
   );
-
   const mediaHora = totals.horas > 0 ? totals.lucro / totals.horas : 0;
 
+  // ── Semanas do mês seleccionado ───────────────────────────────────────────
   const weeklyData = useMemo((): WeekData[] => {
     const weeks: WeekAccumulator = {};
     filteredDays.forEach((day) => {
@@ -355,15 +271,94 @@ function Dashboard({ days, isDemo }: DashboardProps) {
     const fmt = (d: Date) => `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`;
     return Object.entries(weeks)
       .sort(([a], [b]) => new Date(a).getTime() - new Date(b).getTime())
-      .map(([monday, data]) => {
+      .map(([monday, data], i) => {
         const date = new Date(monday);
         const end = new Date(date);
         end.setDate(date.getDate() + 6);
-        const label = isMobile ? fmt(date) : `${fmt(date)} – ${fmt(end)}`;
-        return { label, labelFull: `${fmt(date)} – ${fmt(end)}`, ...data };
+        const label = isMobile ? `S${i + 1}` : `Sem. ${i + 1} (${fmt(date)}–${fmt(end)})`;
+        return { label, labelFull: `Semana ${i + 1} · ${fmt(date)} – ${fmt(end)}`, ...data };
       });
   }, [filteredDays, isMobile]);
 
+  // ── Análise anual — totais por mês ────────────────────────────────────────
+  const analiseAnual = useMemo(() => {
+    const meses: { label: string; ganho: number; lucro: number; dias: number }[] = [];
+    const map: { [key: string]: { ganho: number; lucro: number; dias: number } } = {};
+    days.forEach((day) => {
+      if (!day.date) return;
+      const date = new Date(day.date);
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      if (!map[key]) map[key] = { ganho: 0, lucro: 0, dias: 0 };
+      const d = calcular(day);
+      map[key].ganho += d.ganho;
+      map[key].lucro += d.lucro;
+      map[key].dias += 1;
+    });
+    Object.entries(map)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .forEach(([key, data]) => {
+        const [ano, mes] = key.split('-').map(Number);
+        meses.push({ label: labelMes(ano, mes - 1), ...data });
+      });
+    return meses;
+  }, [days]);
+
+  // ── Análise Break-Even ────────────────────────────────────────────────────
+  function gerarAnaliseBreakEven(): BreakEvenAnalysis | null {
+    if (!temCustos && objetivoSemanal === 0) return null;
+    const linhas: string[] = [];
+    if (objetivoSemanal > 0 && temDadosSemana) {
+      const faltaObjetivo = objetivoSemanal - semanaActual.ganho;
+      const progressoPercent = Math.round((semanaActual.ganho / objetivoSemanal) * 100);
+      if (faltaObjetivo <= 0) {
+        linhas.push(`🎯 Objetivo semanal atingido! Faturaste €${semanaActual.ganho.toFixed(2)} de €${objetivoSemanal.toFixed(2)} (${progressoPercent}%).`);
+      } else {
+        linhas.push(`🎯 Objetivo: €${objetivoSemanal.toFixed(2)} · Atual: €${semanaActual.ganho.toFixed(2)} · Falta: €${faltaObjetivo.toFixed(2)} (${progressoPercent}%)`);
+        if (diasRestantes > 0 && semanaActual.horas > 0) {
+          const ganhoMediaDia = semanaActual.ganho / diasSemanaActual.length;
+          const diasNecessarios = Math.ceil(faltaObjetivo / ganhoMediaDia);
+          const mediaGanhoHora = semanaActual.ganho / semanaActual.horas;
+          const horasNecessarias = mediaGanhoHora > 0 ? Math.ceil(faltaObjetivo / mediaGanhoHora) : 0;
+          if (diasNecessarios <= diasRestantes) {
+            linhas.push(`📅 Ao teu ritmo (€${ganhoMediaDia.toFixed(2)}/dia), precisas de mais ${diasNecessarios} dia${diasNecessarios > 1 ? 's' : ''} para atingir o objetivo.`);
+          } else {
+            linhas.push(`⚠️ Ao ritmo actual não consegues atingir o objetivo esta semana. Aumenta as horas nos dias restantes.`);
+          }
+          if (horasNecessarias > 0) linhas.push(`⏱ Precisas de mais ${horasNecessarias}h a €${mediaGanhoHora.toFixed(2)}/h para atingir o objetivo.`);
+        }
+      }
+    } else if (objetivoSemanal > 0 && !temDadosSemana) {
+      linhas.push(`🎯 Objetivo desta semana: €${objetivoSemanal.toFixed(2)}. Adiciona o primeiro dia para acompanhar o progresso.`);
+    }
+    if (temCustos && temDadosSemana) {
+      if (margem >= 0) {
+        const percentagem = Math.round((semanaActual.lucro / custoSemanal) * 100);
+        linhas.push(`✅ Break-even atingido. Lucro: €${semanaActual.lucro.toFixed(2)} · Custos: €${custoSemanal.toFixed(2)} · Margem: +€${margem.toFixed(2)} (${percentagem}%)`);
+        if (mediaHoraSemana > 0) linhas.push(`💡 €${mediaHoraSemana.toFixed(2)}/h esta semana. ${mediaHoraSemana >= 10 ? 'Boa rentabilidade.' : 'Considera optimizar os horários de pico.'}`);
+      } else {
+        const falta = Math.abs(margem);
+        linhas.push(`🚨 Faltam €${falta.toFixed(2)} para cobrir os custos fixos.`);
+        if (diasRestantes > 0 && semanaActual.horas > 0) {
+          const horasNecessarias = Math.ceil(falta / mediaHoraSemana);
+          linhas.push(`⏱ Precisas de mais ${horasNecessarias}h a €${mediaHoraSemana.toFixed(2)}/h para fechar o break-even.`);
+        }
+      }
+    } else if (temCustos && !temDadosSemana) {
+      linhas.push(`📋 Custos fixos semanais: €${custoSemanal.toFixed(2)}. Adiciona dias para ver a análise.`);
+    }
+    if (semanaActual.km > 0) {
+      const lucroKm = semanaActual.lucro / semanaActual.km;
+      linhas.push(`🗺️ ${semanaActual.km} km esta semana · €${lucroKm.toFixed(2)}/km de lucro.`);
+    }
+    if (linhas.length === 0) return null;
+    const tipo = margem >= 0 && (objetivoSemanal === 0 || semanaActual.ganho >= objetivoSemanal)
+      ? 'positivo' : linhas.some(l => l.includes('🚨')) ? 'negativo' : 'info';
+    return { tipo, linhas };
+  }
+
+  const analiseBreakEven = gerarAnaliseBreakEven();
+
+  // ── Charts ────────────────────────────────────────────────────────────────
   const trendChartData = {
     labels: weeklyData.map((w) => w.label),
     datasets: [
@@ -408,24 +403,31 @@ function Dashboard({ days, isDemo }: DashboardProps) {
     },
   };
 
+  // Gráfico anual
+  const anualChartData = {
+    labels: analiseAnual.map((m) => m.label.split(' ')[0]), // só o nome do mês
+    datasets: [
+      { label: 'Ganho', data: analiseAnual.map((m) => parseFloat(m.ganho.toFixed(2))), backgroundColor: '#22c55e', borderRadius: 6 },
+      { label: 'Lucro', data: analiseAnual.map((m) => parseFloat(m.lucro.toFixed(2))), backgroundColor: '#8b5cf6', borderRadius: 6 },
+    ],
+  };
+
   function gerarAnaliseIA(): string {
     if (filteredDays.length === 0) return 'Sem dados suficientes para gerar uma análise.';
-    let texto = '📊 Análise Inteligente\n\n';
-    texto += `Lucro total: €${totals.lucro.toFixed(2)}\n`;
-    texto += `Ganho total: €${totals.ganho.toFixed(2)}\n`;
-    if (totals.gorjetas > 0) texto += `Total gorjetas: €${totals.gorjetas.toFixed(2)}\n`;
-    texto += `Despesas totais: €${totals.despesas.toFixed(2)}\n`;
-    texto += `Média por hora: €${mediaHora.toFixed(2)}\n`;
-    if (totals.km > 0) texto += `Km totais: ${totals.km} km\n`;
-    if (temCustos) texto += `Custo fixo semanal: €${custoSemanal.toFixed(2)}\n`;
+    const mesSel = mesesDisponiveis.find(m => m.key === mesSelecionado);
+    let texto = `📊 Análise Inteligente — ${mesSel?.label ?? ''}\n\n`;
+    texto += `Lucro: €${totals.lucro.toFixed(2)} · Ganho: €${totals.ganho.toFixed(2)}\n`;
+    if (totals.gorjetas > 0) texto += `Gorjetas: €${totals.gorjetas.toFixed(2)}\n`;
+    texto += `Despesas: €${totals.despesas.toFixed(2)} · €/h: €${mediaHora.toFixed(2)}\n`;
+    if (totals.km > 0) texto += `Km: ${totals.km} · Lucro/km: €${(totals.lucro / totals.km).toFixed(2)}\n`;
     if (objetivoSemanal > 0) texto += `Objetivo semanal: €${objetivoSemanal.toFixed(2)}\n`;
     texto += '\n';
     if (totals.lucro < 0) {
-      texto += '🚨 O período está negativo. Prioridade: rever combustível, percentagem do operador e horários de trabalho.\n\n';
+      texto += '🚨 Mês negativo. Prioridade: rever combustível, operador e horários.\n\n';
     } else if (mediaHora < 10) {
-      texto += '⚠️ O lucro existe, mas a rentabilidade por hora está baixa. O foco deve ser melhorar horários e zonas de maior procura.\n\n';
+      texto += '⚠️ Rentabilidade por hora baixa. Foca horários e zonas de maior procura.\n\n';
     } else {
-      texto += '✅ A rentabilidade está saudável. O objetivo agora é repetir os padrões dos melhores dias.\n\n';
+      texto += '✅ Rentabilidade saudável. Repete os padrões dos melhores dias.\n\n';
     }
     if (weeklyData.length >= 2) {
       const ultima = weeklyData[weeklyData.length - 1];
@@ -436,10 +438,9 @@ function Dashboard({ days, isDemo }: DashboardProps) {
         else if (diff < 0) texto += `📉 A última semana foi €${Math.abs(diff).toFixed(2)} pior que a anterior.\n`;
       }
     }
-    if (totals.uber > totals.bolt) texto += '💡 Uber teve melhor desempenho que Bolt neste período.\n';
-    else if (totals.bolt > totals.uber) texto += '💡 Bolt teve melhor desempenho que Uber neste período.\n';
-    else texto += '💡 Uber e Bolt tiveram desempenho semelhante.\n';
-    texto += '\n👉 Próximo passo: compare os dias com maior lucro e identifique horário, plataforma e custo de combustível.';
+    if (totals.uber > totals.bolt) texto += '💡 Uber teve melhor desempenho que Bolt.\n';
+    else if (totals.bolt > totals.uber) texto += '💡 Bolt teve melhor desempenho que Uber.\n';
+    texto += '\n👉 Compara os dias com maior lucro e identifica horário, plataforma e custo de combustível.';
     return texto;
   }
 
@@ -449,107 +450,86 @@ function Dashboard({ days, isDemo }: DashboardProps) {
     negativo: { background: '#fef2f2', border: '1px solid #fca5a5' },
     info: { background: '#eef2ff', border: '1px solid #c7d2fe' },
   };
-
-  // Progresso do objetivo
   const progressoObjetivo = objetivoSemanal > 0
-    ? Math.min(100, Math.round((semanaActual.ganho / objetivoSemanal) * 100))
-    : 0;
+    ? Math.min(100, Math.round((semanaActual.ganho / objetivoSemanal) * 100)) : 0;
 
   return (
     <div>
+      {/* Header */}
       <header style={s.header}>
         <div style={{ flex: 1 }}>
           <p style={s.eyebrow}>Performance Overview</p>
           <h1 style={s.title}>Dashboard</h1>
-          {!isMobile && (
-            <p style={s.subtitle}>
-              Acompanhe ganhos, plataformas, despesas e lucro real com visão clara para decisão.
-            </p>
-          )}
+          {!isMobile && <p style={s.subtitle}>Acompanhe ganhos, plataformas, despesas e lucro real com visão clara para decisão.</p>}
         </div>
         <button style={s.aiButton} onClick={() => setInsight(gerarAnaliseIA())}>
           {isMobile ? '🤖 IA' : '🤖 Analisar com IA'}
         </button>
       </header>
 
-      {/* ── Objetivo Semanal ── */}
+      {/* Objetivo Semanal */}
       <section style={s.objetivoCard}>
         <div style={s.objetivoHeader}>
           <div>
             <p style={s.objetivoLabel}>🎯 Objetivo desta semana</p>
-            {objetivoSemanal > 0 ? (
-              <p style={s.objetivoValor}>€{objetivoSemanal.toFixed(2)}</p>
-            ) : (
-              <p style={s.objetivoVazio}>Não definido</p>
-            )}
+            {objetivoSemanal > 0
+              ? <p style={s.objetivoValor}>€{objetivoSemanal.toFixed(2)}</p>
+              : <p style={s.objetivoVazio}>Não definido</p>}
           </div>
-          <button
-            style={s.objetivoBtn}
-            onClick={() => { setEditandoObjetivo(true); setObjetivoInput(objetivoSemanal > 0 ? String(objetivoSemanal) : ''); }}
-          >
+          <button style={s.objetivoBtn} onClick={() => { setEditandoObjetivo(true); setObjetivoInput(objetivoSemanal > 0 ? String(objetivoSemanal) : ''); }}>
             {objetivoSemanal > 0 ? '✏️ Editar' : '+ Definir'}
           </button>
         </div>
-
         {editandoObjetivo && (
           <div style={s.objetivoForm}>
-            <input
-              type="number"
-              value={objetivoInput}
+            <input type="number" value={objetivoInput}
               onChange={(e: ChangeEvent<HTMLInputElement>) => setObjetivoInput(e.target.value)}
-              placeholder="Ex: 450"
-              style={s.objetivoInput}
-              autoFocus
-            />
+              placeholder="Ex: 450" style={s.objetivoInput} autoFocus />
             <button style={s.objetivoGuardar} onClick={guardarObjetivo}>Guardar</button>
             <button style={s.objetivoCancelar} onClick={() => setEditandoObjetivo(false)}>Cancelar</button>
           </div>
         )}
-
         {objetivoSemanal > 0 && temDadosSemana && (
           <>
             <div style={s.progressoBar}>
               <div style={{ ...s.progressoFill, width: `${progressoObjetivo}%`, background: progressoObjetivo >= 100 ? '#16a34a' : progressoObjetivo >= 70 ? '#f59e0b' : '#4f46e5' }} />
             </div>
             <div style={s.progressoInfo}>
-              <span style={{ color: '#64748b', fontSize: '13px', fontWeight: 700 }}>
-                €{semanaActual.ganho.toFixed(2)} / €{objetivoSemanal.toFixed(2)}
-              </span>
-              <span style={{ color: progressoObjetivo >= 100 ? '#16a34a' : '#4f46e5', fontSize: '13px', fontWeight: 900 }}>
-                {progressoObjetivo}%
-              </span>
+              <span style={{ color: '#64748b', fontSize: '13px', fontWeight: 700 }}>€{semanaActual.ganho.toFixed(2)} / €{objetivoSemanal.toFixed(2)}</span>
+              <span style={{ color: progressoObjetivo >= 100 ? '#16a34a' : '#4f46e5', fontSize: '13px', fontWeight: 900 }}>{progressoObjetivo}%</span>
             </div>
           </>
         )}
       </section>
 
-      {/* Análise Break-Even + Objetivo */}
+      {/* Análise semana */}
       {analiseBreakEven && (
         <section style={{ ...s.breakEvenBox, ...breakEvenColors[analiseBreakEven.tipo] }}>
           <p style={s.breakEvenTitulo}>
             {analiseBreakEven.tipo === 'positivo' ? '✅' : analiseBreakEven.tipo === 'negativo' ? '🚨' : '📋'} Análise da Semana Actual
             {temCustos && <span style={s.breakEvenCusto}> · Custo semanal: €{custoSemanal.toFixed(2)}</span>}
           </p>
-          {analiseBreakEven.linhas.map((linha, i) => (
-            <p key={i} style={s.breakEvenLinha}>{linha}</p>
-          ))}
-          {!temCustos && objetivoSemanal === 0 && (
-            <p style={{ ...s.breakEvenLinha, color: '#6366f1', marginTop: '8px' }}>
-              👉 Define o teu <strong>objetivo semanal</strong> acima e os <strong>Custos Fixos</strong> para activar a análise completa.
-            </p>
-          )}
+          {analiseBreakEven.linhas.map((linha, i) => <p key={i} style={s.breakEvenLinha}>{linha}</p>)}
         </section>
       )}
 
-      <section style={s.filters}>
-        {(['7d', '30d', 'all'] as Period[]).map((value) => (
-          <button key={value} onClick={() => setPeriod(value)}
-            style={{ ...s.filter, ...(period === value ? s.filterActive : {}) }}>
-            {value === '7d' ? '7 dias' : value === '30d' ? '30 dias' : 'Todos'}
-          </button>
-        ))}
+      {/* ── Selector de Mês ── */}
+      <section style={s.mesNav}>
+        <div style={s.mesNavHeader}>
+          <p style={s.mesNavLabel}>📅 A ver:</p>
+          <select
+            value={mesSelecionado}
+            onChange={(e: ChangeEvent<HTMLSelectElement>) => setMesSelecionado(e.target.value)}
+            style={s.mesSelect}
+          >
+            {mesesDisponiveis.map((m) => (
+              <option key={m.key} value={m.key}>{m.label}</option>
+            ))}
+          </select>
+        </div>
       </section>
 
+      {/* KPIs do mês */}
       <section style={s.kpiGrid}>
         <KpiCard title="Lucro Total" value={totals.lucro} color="#16a34a" featured isMobile={isMobile} />
         <KpiCard title="Ganho Total" value={totals.ganho} color="#2563eb" isMobile={isMobile} />
@@ -568,36 +548,24 @@ function Dashboard({ days, isDemo }: DashboardProps) {
       {totals.km > 0 && (
         <section style={s.kmCard}>
           <div style={s.kmRow}>
-            <div>
-              <p style={s.kmLabel}>🗺️ Km totais</p>
-              <p style={s.kmValor}>{totals.km} km</p>
-            </div>
-            <div>
-              <p style={s.kmLabel}>Lucro / km</p>
-              <p style={{ ...s.kmValor, color: '#8b5cf6' }}>
-                €{totals.km > 0 ? (totals.lucro / totals.km).toFixed(2) : '0.00'}/km
-              </p>
-            </div>
-            <div>
-              <p style={s.kmLabel}>Km / hora</p>
-              <p style={{ ...s.kmValor, color: '#3b82f6' }}>
-                {totals.horas > 0 ? Math.round(totals.km / totals.horas) : 0} km/h
-              </p>
-            </div>
+            <div><p style={s.kmLabel}>🗺️ Km totais</p><p style={s.kmValor}>{totals.km} km</p></div>
+            <div><p style={s.kmLabel}>Lucro / km</p><p style={{ ...s.kmValor, color: '#8b5cf6' }}>€{(totals.lucro / totals.km).toFixed(2)}/km</p></div>
+            <div><p style={s.kmLabel}>Km / hora</p><p style={{ ...s.kmValor, color: '#3b82f6' }}>{totals.horas > 0 ? Math.round(totals.km / totals.horas) : 0} km/h</p></div>
           </div>
         </section>
       )}
 
       {insight && <section style={s.insightBox}>{insight}</section>}
 
-      {weeklyData.length >= 2 && (
+      {/* Semanas do mês */}
+      {weeklyData.length > 0 && (
         <section style={s.chartCard}>
           <div style={s.chartHeader}>
             <div>
               <p style={s.eyebrow}>Weekly Trend</p>
-              <h2 style={s.sectionTitle}>Evolução Semanal de Lucro</h2>
+              <h2 style={s.sectionTitle}>Semanas de {mesesDisponiveis.find(m => m.key === mesSelecionado)?.label}</h2>
             </div>
-            <span style={s.badge}>{weeklyData.length} semanas</span>
+            <span style={s.badge}>{weeklyData.length} semana{weeklyData.length !== 1 ? 's' : ''}</span>
           </div>
           <div style={s.weekGrid}>
             {weeklyData.map((w, i) => {
@@ -605,10 +573,8 @@ function Dashboard({ days, isDemo }: DashboardProps) {
               const delta = prev ? w.lucro - prev.lucro : null;
               return (
                 <div key={i} style={s.weekCard}>
-                  <p style={s.weekLabel}>{w.labelFull || w.label}</p>
-                  <p style={{ ...s.weekValue, color: w.lucro >= 0 ? '#16a34a' : '#dc2626' }}>
-                    €{w.lucro.toFixed(2)}
-                  </p>
+                  <p style={s.weekLabel}>{w.labelFull}</p>
+                  <p style={{ ...s.weekValue, color: w.lucro >= 0 ? '#16a34a' : '#dc2626' }}>€{w.lucro.toFixed(2)}</p>
                   {delta !== null && (
                     <p style={{ ...s.weekDelta, color: delta >= 0 ? '#16a34a' : '#dc2626' }}>
                       {delta >= 0 ? '▲' : '▼'} €{Math.abs(delta).toFixed(2)}
@@ -619,13 +585,16 @@ function Dashboard({ days, isDemo }: DashboardProps) {
               );
             })}
           </div>
-          <div style={s.chartBox}>
-            <Line data={trendChartData} options={trendChartOptions} />
-          </div>
+          {weeklyData.length >= 2 && (
+            <div style={s.chartBox}>
+              <Line data={trendChartData} options={trendChartOptions} />
+            </div>
+          )}
         </section>
       )}
 
-      {(!isMobile || filteredDays.length <= 14) && (
+      {/* Breakdown diário do mês */}
+      {(!isMobile || filteredDays.length <= 14) && filteredDays.length > 0 && (
         <section style={{ ...s.chartCard, marginTop: '16px' }}>
           <div style={s.chartHeader}>
             <div>
@@ -635,17 +604,48 @@ function Dashboard({ days, isDemo }: DashboardProps) {
             <span style={s.badge}>{filteredDays.length} dias</span>
           </div>
           <div style={s.chartBox}>
-            {filteredDays.length > 0 ? <Bar data={chartData} options={chartOptions} /> : <p style={s.empty}>Sem dados para apresentar.</p>}
+            <Bar data={chartData} options={chartOptions} />
           </div>
         </section>
       )}
 
-      {isMobile && filteredDays.length > 14 && (
-        <section style={{ ...s.chartCard, marginTop: '16px', textAlign: 'center' }}>
-          <p style={{ margin: 0, color: '#64748b', fontWeight: 700, fontSize: '14px' }}>
-            📱 Gráfico diário disponível em ecrã maior.<br />
-            Use o filtro <strong>7 dias</strong> ou <strong>30 dias</strong> para ver o breakdown.
+      {filteredDays.length === 0 && (
+        <section style={{ ...s.chartCard, marginTop: '16px', textAlign: 'center', padding: '40px' }}>
+          <p style={{ margin: 0, color: '#64748b', fontWeight: 700, fontSize: '15px' }}>
+            Sem dados para {mesesDisponiveis.find(m => m.key === mesSelecionado)?.label}.<br />
+            Adiciona dias de trabalho para ver a análise.
           </p>
+        </section>
+      )}
+
+      {/* Visão Anual */}
+      {analiseAnual.length >= 2 && (
+        <section style={{ ...s.chartCard, marginTop: '16px' }}>
+          <div style={s.chartHeader}>
+            <div>
+              <p style={s.eyebrow}>Annual Overview</p>
+              <h2 style={s.sectionTitle}>Visão Anual</h2>
+            </div>
+            <span style={s.badge}>{analiseAnual.length} meses</span>
+          </div>
+          <div style={s.weekGrid}>
+            {analiseAnual.map((m, i) => (
+              <div key={i}
+                style={{ ...s.weekCard, cursor: 'pointer', ...(mesesDisponiveis.find(opt => opt.label === m.label) ? {} : {}) }}
+                onClick={() => {
+                  const opt = mesesDisponiveis.find(opt => opt.label === m.label);
+                  if (opt) { setMesSelecionado(opt.key); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+                }}
+              >
+                <p style={s.weekLabel}>{m.label}</p>
+                <p style={{ ...s.weekValue, color: m.lucro >= 0 ? '#16a34a' : '#dc2626' }}>€{m.lucro.toFixed(2)}</p>
+                <p style={s.weekDias}>{m.dias} dias</p>
+              </div>
+            ))}
+          </div>
+          <div style={s.chartBox}>
+            <Bar data={anualChartData} options={{ ...chartOptions, plugins: { ...chartOptions.plugins, legend: { labels: { color: '#475569', font: { weight: 700 as const } } } } }} />
+          </div>
         </section>
       )}
     </div>
@@ -676,9 +676,10 @@ const desktopStyles: Styles = {
   breakEvenTitulo: { margin: '0 0 10px', fontWeight: 900, fontSize: '15px', color: '#0f172a' },
   breakEvenCusto: { fontSize: '13px', fontWeight: 700, color: '#64748b' },
   breakEvenLinha: { margin: '4px 0 0', fontSize: '14px', lineHeight: 1.7, color: '#1e293b', fontWeight: 600 },
-  filters: { display: 'flex', gap: '10px', marginBottom: '24px' },
-  filter: { padding: '11px 16px', borderRadius: '14px', border: '1px solid #e2e8f0', background: '#ffffff', color: '#475569', fontWeight: 800, cursor: 'pointer' },
-  filterActive: { background: '#0f172a', color: '#ffffff', borderColor: '#0f172a' },
+  mesNav: { marginBottom: '20px' },
+  mesNavHeader: { display: 'flex', alignItems: 'center', gap: '12px' },
+  mesNavLabel: { margin: 0, fontSize: '14px', fontWeight: 800, color: '#475569' },
+  mesSelect: { padding: '10px 16px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#ffffff', fontSize: '15px', fontWeight: 800, color: '#0f172a', cursor: 'pointer', outline: 'none' },
   kpiGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '18px', marginBottom: '18px' },
   kpiCard: { padding: '24px', borderRadius: '24px', background: '#ffffff', border: '1px solid #e5e7eb', boxShadow: '0 18px 45px rgba(15,23,42,0.06)' },
   kpiFeatured: { border: '1px solid rgba(79,70,229,0.35)', boxShadow: '0 22px 55px rgba(79,70,229,0.14)' },
@@ -698,7 +699,7 @@ const desktopStyles: Styles = {
   badge: { padding: '9px 14px', borderRadius: '999px', background: '#f1f5f9', color: '#475569', fontWeight: 900, whiteSpace: 'nowrap' },
   chartBox: { height: '340px' },
   empty: { color: '#64748b', fontWeight: 700 },
-  weekGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px', marginBottom: '24px' },
+  weekGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px', marginBottom: '24px' },
   weekCard: { padding: '16px', borderRadius: '18px', background: '#f8fafc', border: '1px solid #e2e8f0', textAlign: 'center' },
   weekLabel: { margin: '0 0 8px', fontSize: '11px', fontWeight: 900, color: '#64748b', letterSpacing: '0.05em' },
   weekValue: { margin: 0, fontSize: '22px', fontWeight: 900 },
@@ -716,9 +717,9 @@ const mobileStyles: Styles = {
   breakEvenBox: { padding: '16px', borderRadius: '18px', marginBottom: '16px' },
   breakEvenTitulo: { margin: '0 0 8px', fontWeight: 900, fontSize: '14px', color: '#0f172a' },
   breakEvenLinha: { margin: '4px 0 0', fontSize: '13px', lineHeight: 1.6, color: '#1e293b', fontWeight: 600 },
-  filters: { display: 'flex', gap: '8px', marginBottom: '16px' },
-  filter: { padding: '9px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#ffffff', color: '#475569', fontWeight: 800, cursor: 'pointer', fontSize: '13px' },
-  filterActive: { background: '#0f172a', color: '#ffffff', borderColor: '#0f172a' },
+  mesNav: { marginBottom: '16px' },
+  mesSelect: { padding: '9px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#ffffff', fontSize: '14px', fontWeight: 800, color: '#0f172a', cursor: 'pointer', outline: 'none', width: '100%' },
+  mesNavHeader: { display: 'flex', flexDirection: 'column', gap: '8px' },
   kpiGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' },
   kpiCard: { padding: '16px', borderRadius: '18px', background: '#ffffff', border: '1px solid #e5e7eb', boxShadow: '0 8px 24px rgba(15,23,42,0.06)' },
   kpiFeatured: { border: '1px solid rgba(79,70,229,0.35)', boxShadow: '0 12px 30px rgba(79,70,229,0.12)' },
