@@ -16,52 +16,53 @@ This dashboard solves that problem by turning raw daily data into **clear financ
 
 ## 🚀 Key Features
 
-### 📊 Weekly Profit Analysis (Real Payout Logic)
-
-- Data grouped by **weekly payout cycle (Monday → Sunday)**
-- Reflects how drivers actually get paid
-- Helps identify profitable vs unprofitable weeks
-
----
+### 📊 Monthly & Weekly Navigation
+- Browse data **month by month** — no more mixed periods
+- Each month shows its weeks in isolation
+- Week-over-week delta within the same month
+- Annual overview with one card per month — clickable to drill down
 
 ### 💰 Fixed Cost Control & Break-Even Analysis
-
 - Track all fixed costs: car lease, insurance, IUC, maintenance, washing, food, taxes
 - Operator commission (%) configured once — applied automatically to every day
 - Fuel tracked per day — summed automatically, no double entry
 - Real-time weekly break-even analysis: are you covering your costs this week?
 - Smart recommendations: how many more hours or days you need to break even
 
----
+### 🎯 Weekly Goal Tracking
+- Set a weekly earnings target directly on the Dashboard
+- Progress bar updated in real time as days are added
+- AI analysis tells you exactly how many more hours or days you need to hit your goal
+
+### 🗺️ Kilometre Tracking
+- Log start and end km for each day
+- Total km, profit per km, and km per hour calculated automatically
+- Weekly km summary on the Dashboard
+
+### 🎁 Tips Tracking
+- Separate fields for Uber app tips, Bolt app tips, and cash tips
+- Total earnings calculated automatically — no manual math
+- Tips visible as a standalone metric in the Dashboard
+
+### 📄 Document Expiry Control
+- Track all TVDE documents with expiry dates
+- 6 pre-loaded shortcuts for the most common documents
+- Three-level alerts: 🟢 Valid · 🟡 Renew soon · 🔴 Urgent / Expired
+- Recommended renewal date calculated automatically (15 days before expiry)
+- Red badge on navigation when something needs attention
 
 ### 🔄 Dual Input System
-
 Supports two real-world workflows:
-
 - **Quick Mode** → total earnings per day
 - **Detailed Mode** → ride-by-ride tracking
 
----
-
 ### ⚖️ Uber vs Bolt Comparison
-
 - Understand which platform performs better
 - Data-driven decision making
 
----
-
-### 💸 Automatic Cost Calculation
-
-- Fuel costs tracked per day
-- Operator commission applied globally
-- Real net profit (not just earnings)
-
----
-
 ### 📈 Smart Insights
-
-- Profitability analysis
-- Profit per hour
+- Profitability analysis per period
+- Profit per hour and profit per km
 - Weekly trend with week-over-week delta
 - Break-even status with actionable recommendations
 
@@ -73,18 +74,19 @@ This project is built around a real constraint:
 
 > Drivers don't think daily — they think weekly (because they get paid weekly).
 
-That's why the dashboard focuses on **weekly analytics instead of daily metrics** — and shows whether fixed costs are being covered each week.
+That's why the dashboard focuses on **weekly analytics inside monthly views** — and shows whether fixed costs are being covered each week.
 
 ---
 
 ## 🛠️ Tech Stack
 
-- TypeScript
+- TypeScript (strict mode, full migration)
 - React (Hooks + Context API)
 - React Router v6 (client-side routing)
+- Vite (build tool)
 - Chart.js (data visualization)
-- CSS (custom UI)
-- Demo data preloaded for first-time visitors
+- Vitest (unit tests — 9 passing)
+- Mobile-first responsive layout
 
 ---
 
@@ -108,16 +110,18 @@ That's why the dashboard focuses on **weekly analytics instead of daily metrics*
 - Building business logic, not just UI
 - Creating a usable tool, not just a demo project
 - Mobile-first responsive layout with bottom navigation
-- No double data entry — fuel and operator costs flow automatically
+- No double data entry — fuel, operator costs, and tips flow automatically
 - Full TypeScript migration with typed interfaces and strict mode
+- Unit tested with Vitest
 
 ---
 
 ## 🔮 Next Steps
 
-- Unit tests (Vitest)
 - Backend integration (Firebase)
+- Push notifications for document expiry
 - Best day / best time detection
+- PDF/Excel export
 
 ---
 
