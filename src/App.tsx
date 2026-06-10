@@ -25,7 +25,6 @@ interface NavItem {
   path: string;
   badge?: number;
 }
-
 interface StoredDocument {
   id: string;
   dataValidade: string;
@@ -44,10 +43,61 @@ function contarDocumentosUrgentes(): number {
   }).length;
 }
 
+// Soma duas strings numéricas (campos opcionais), devolve string ou undefined
+function somarStr(a?: string, b?: string): string | undefined {
+  const va = Number(a) || 0;
+  const vb = Number(b) || 0;
+  const total = va + vb;
+  if (total === 0 && !a && !b) return undefined;
+  return String(total);
+}
+
+// Junta um novo registo do dia a um registo já existente para a mesma data
+// (soma valores — útil para motoristas com turno de manhã + noite)
+function mergeDays(existing: Day, incoming: Day): Day {
+  const ganho = (Number(existing.ganho) || 0) + (Number(incoming.ganho) || 0);
+  const horas = String((Number(existing.horas) || 0) + (Number(incoming.horas) || 0));
+  const combustivel = String((Number(existing.combustivel) || 0) + (Number(incoming.combustivel) || 0));
+  const uberTotal = String((Number(existing.uberTotal) || 0) + (Number(incoming.uberTotal) || 0));
+  const boltTotal = String((Number(existing.boltTotal) || 0) + (Number(incoming.boltTotal) || 0));
+
+  // Km: mantém o km início mais antigo e soma os km percorridos ao km fim
+  const existingKm = existing.kmInicio && existing.kmFim
+    ? Math.max(0, (Number(existing.kmFim) || 0) - (Number(existing.kmInicio) || 0)) : 0;
+  const incomingKm = incoming.kmInicio && incoming.kmFim
+    ? Math.max(0, (Number(incoming.kmFim) || 0) - (Number(incoming.kmInicio) || 0)) : 0;
+
+  let kmInicio = existing.kmInicio;
+  let kmFim = existing.kmFim;
+  if (!kmInicio && incoming.kmInicio) kmInicio = incoming.kmInicio;
+  if (kmInicio && (existingKm + incomingKm) > 0) {
+    kmFim = String(Number(kmInicio) + existingKm + incomingKm);
+  } else if (incoming.kmFim) {
+    kmFim = incoming.kmFim;
+  }
+
+  return {
+    ...existing,
+    mode: incoming.mode,
+    ganho: String(ganho),
+    uberTotal,
+    boltTotal,
+    gorjetaUber: somarStr(existing.gorjetaUber, incoming.gorjetaUber),
+    gorjetaBolt: somarStr(existing.gorjetaBolt, incoming.gorjetaBolt),
+    gorjetaDinheiro: somarStr(existing.gorjetaDinheiro, incoming.gorjetaDinheiro),
+    combustivel,
+    horas,
+    kmInicio,
+    kmFim,
+    rides: [...(existing.rides ?? []), ...(incoming.rides ?? [])],
+  };
+}
+
 function App() {
   const [isDemo, setIsDemo] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [docAlerts, setDocAlerts] = useState(() => contarDocumentosUrgentes());
+  const [editingDay, setEditingDay] = useState<Day | null>(null);
   const isMobile = useIsMobile();
   const navigate = useNavigate();
   const location = useLocation();
@@ -78,20 +128,51 @@ function App() {
     setDocAlerts(contarDocumentosUrgentes());
   }, [location.pathname]);
 
+  // Limpa o estado de edição sempre que sai da página /add
+  useEffect(() => {
+    if (location.pathname !== '/add' && editingDay) {
+      setEditingDay(null);
+    }
+  }, [location.pathname, editingDay]);
+
   function goTo(path: string): void {
     navigate(path);
     setMenuOpen(false);
   }
 
+  // Adiciona um novo dia. Se já existir um registo com a mesma data,
+  // soma os valores ao registo existente em vez de criar uma nova linha
+  // (cobre o caso de turno de manhã + turno de noite no mesmo dia).
   function handleAddDay(newDay: Day): void {
     if (isDemo) {
       setIsDemo(false);
       setDays([newDay]);
       localStorage.setItem('driver-days', JSON.stringify([newDay]));
-    } else {
-      setDays((prev) => [...prev, newDay]);
+      navigate('/');
+      return;
     }
+
+    setDays((prev) => {
+      const existingIndex = prev.findIndex((d) => d.date === newDay.date);
+      if (existingIndex === -1) {
+        return [...prev, newDay];
+      }
+      const merged = mergeDays(prev[existingIndex], newDay);
+      const next = [...prev];
+      next[existingIndex] = merged;
+      return next;
+    });
     navigate('/');
+  }
+
+  function handleUpdateDay(updatedDay: Day): void {
+    setDays((prev) => prev.map((d) => (d.id === updatedDay.id ? updatedDay : d)));
+    setEditingDay(null);
+  }
+
+  function handleEditDay(day: Day): void {
+    setEditingDay(day);
+    navigate('/add');
   }
 
   const navItems: NavItem[] = [
@@ -107,8 +188,8 @@ function App() {
   const pageContent = (
     <Routes>
       <Route path="/" element={<Dashboard days={days} isDemo={isDemo} />} />
-      <Route path="/add" element={<AddDay onSave={handleAddDay} />} />
-      <Route path="/history" element={<History days={days} setDays={setDays} isDemo={isDemo} />} />
+      <Route path="/add" element={<AddDay onSave={handleAddDay} onUpdate={handleUpdateDay} editingDay={editingDay} />} />
+      <Route path="/history" element={<History days={days} setDays={setDays} onEdit={handleEditDay} isDemo={isDemo} />} />
       <Route path="/costs" element={<Costs days={days} />} />
       <Route path="/documents" element={<Documents />} />
     </Routes>
@@ -131,7 +212,6 @@ function App() {
             {menuOpen ? '✕' : '☰'}
           </button>
         </header>
-
         {menuOpen && (
           <>
             <div style={mobile.overlay} onClick={() => setMenuOpen(false)} />
@@ -155,9 +235,7 @@ function App() {
             </nav>
           </>
         )}
-
         <main style={mobile.main}>{pageContent}</main>
-
         {/* Bottom nav — mostra só os 4 principais, documentos vai para o drawer */}
         <nav style={mobile.bottomNav}>
           {navItems.slice(0, 4).map((item) => (
@@ -203,14 +281,12 @@ function App() {
           <h1 style={desktop.logo}>🚗 DriveOS</h1>
           <p style={desktop.logoSub}>Finance Dashboard</p>
         </div>
-
         {isDemo && (
           <div style={desktop.demoBadge}>
             <span style={desktop.demoDot} />
             Modo Demo
           </div>
         )}
-
         <nav style={desktop.nav}>
           {navItems.map((item) => (
             <button
@@ -230,7 +306,6 @@ function App() {
           ))}
         </nav>
       </aside>
-
       <main style={desktop.main}>{pageContent}</main>
     </div>
   );

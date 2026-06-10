@@ -1,9 +1,12 @@
-import { useContext, useState, CSSProperties, FormEvent, ChangeEvent } from 'react';
+import { useContext, useState, useEffect, CSSProperties, FormEvent, ChangeEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AppContext } from '../context/AppContext';
 import { Day, Ride } from '../types';
 
 interface AddDayProps {
   onSave: (day: Day) => void;
+  onUpdate: (day: Day) => void;
+  editingDay: Day | null;
 }
 
 interface FormState {
@@ -33,6 +36,36 @@ interface InputProps {
 type Mode = 'total' | 'rides';
 type Styles = Record<string, CSSProperties>;
 
+const emptyForm: FormState = {
+  date: '',
+  uberTotal: '',
+  boltTotal: '',
+  gorjetaUber: '',
+  gorjetaBolt: '',
+  gorjetaDinheiro: '',
+  combustivel: '',
+  horas: '',
+  kmInicio: '',
+  kmFim: '',
+  rides: [],
+};
+
+function dayToForm(day: Day): FormState {
+  return {
+    date: day.date ?? '',
+    uberTotal: day.uberTotal ?? '',
+    boltTotal: day.boltTotal ?? '',
+    gorjetaUber: day.gorjetaUber ?? '',
+    gorjetaBolt: day.gorjetaBolt ?? '',
+    gorjetaDinheiro: day.gorjetaDinheiro ?? '',
+    combustivel: day.combustivel ?? '',
+    horas: day.horas ?? '',
+    kmInicio: day.kmInicio ?? '',
+    kmFim: day.kmFim ?? '',
+    rides: day.rides ?? [],
+  };
+}
+
 function Input({ label, type, value, onChange, readOnly, highlight, placeholder }: InputProps) {
   return (
     <label style={styles.label}>
@@ -53,25 +86,26 @@ function Input({ label, type, value, onChange, readOnly, highlight, placeholder 
   );
 }
 
-function AddDay({ onSave }: AddDayProps) {
+function AddDay({ onSave, onUpdate, editingDay }: AddDayProps) {
   const { costs } = useContext(AppContext);
-  const [mode, setMode] = useState<Mode>('total');
+  const navigate = useNavigate();
+  const isEditing = !!editingDay;
 
-  const [form, setForm] = useState<FormState>({
-    date: '',
-    uberTotal: '',
-    boltTotal: '',
-    gorjetaUber: '',
-    gorjetaBolt: '',
-    gorjetaDinheiro: '',
-    combustivel: '',
-    horas: '',
-    kmInicio: '',
-    kmFim: '',
-    rides: [],
-  });
+  const [mode, setMode] = useState<Mode>(editingDay?.mode ?? 'total');
+  const [form, setForm] = useState<FormState>(editingDay ? dayToForm(editingDay) : emptyForm);
 
   const [ride, setRide] = useState<Ride>({ plataforma: 'uber', valor: '' });
+
+  // Sincroniza o formulário sempre que o dia em edição mudar
+  useEffect(() => {
+    if (editingDay) {
+      setForm(dayToForm(editingDay));
+      setMode(editingDay.mode);
+    } else {
+      setForm(emptyForm);
+      setMode('total');
+    }
+  }, [editingDay]);
 
   const ganhoCalculado: number =
     mode === 'rides'
@@ -91,16 +125,13 @@ function AddDay({ onSave }: AddDayProps) {
   const operadorPreview = ganhoCalculado * ((Number(costs.operadorPercent) || 0) / 100);
   const lucroPreview = ganhoCalculado - combustivelPreview - operadorPreview;
 
-  // Km calculados automaticamente
   const kmTotal: number =
     form.kmInicio && form.kmFim
       ? Math.max(0, (Number(form.kmFim) || 0) - (Number(form.kmInicio) || 0))
       : 0;
 
   const custoPorKm: number =
-    kmTotal > 0 && ganhoCalculado > 0
-      ? lucroPreview / kmTotal
-      : 0;
+    kmTotal > 0 && ganhoCalculado > 0 ? lucroPreview / kmTotal : 0;
 
   function addRide(): void {
     if (!ride.valor) return;
@@ -109,14 +140,24 @@ function AddDay({ onSave }: AddDayProps) {
   }
 
   function removeRide(index: number): void {
-    setForm((prev) => ({
-      ...prev,
-      rides: prev.rides.filter((_, i) => i !== index),
-    }));
+    setForm((prev) => ({ ...prev, rides: prev.rides.filter((_, i) => i !== index) }));
   }
 
   function handleSubmit(e: FormEvent<HTMLFormElement>): void {
     e.preventDefault();
+
+    if (isEditing && editingDay) {
+      const updatedDay: Day = {
+        ...editingDay,
+        ...form,
+        mode,
+        ganho: String(ganhoCalculado),
+      };
+      onUpdate(updatedDay);
+      navigate('/history');
+      return;
+    }
+
     const newDay: Day = {
       ...form,
       id: crypto.randomUUID(),
@@ -125,30 +166,33 @@ function AddDay({ onSave }: AddDayProps) {
       operadorPercent: costs.operadorPercent || 0,
     };
     onSave(newDay);
-    setForm({
-      date: '',
-      uberTotal: '',
-      boltTotal: '',
-      gorjetaUber: '',
-      gorjetaBolt: '',
-      gorjetaDinheiro: '',
-      combustivel: '',
-      horas: '',
-      kmInicio: '',
-      kmFim: '',
-      rides: [],
-    });
+    setForm(emptyForm);
+  }
+
+  function handleCancelEdit(): void {
+    navigate('/history');
   }
 
   return (
     <div>
       <header style={styles.header}>
-        <p style={styles.eyebrow}>New Entry</p>
-        <h1 style={styles.title}>Adicionar Dia</h1>
+        <p style={styles.eyebrow}>{isEditing ? 'Edit Entry' : 'New Entry'}</p>
+        <h1 style={styles.title}>{isEditing ? 'Editar Dia' : 'Adicionar Dia'}</h1>
         <p style={styles.subtitle}>
-          Registe um dia completo ou detalhe corrida por corrida.
+          {isEditing
+            ? `A editar o registo de ${editingDay?.date}.`
+            : 'Registe um dia completo ou detalhe corrida por corrida.'}
         </p>
       </header>
+
+      {isEditing && (
+        <div style={styles.editBanner}>
+          <span>✏️ Estás a editar um registo existente.</span>
+          <button type="button" onClick={handleCancelEdit} style={styles.editCancelBtn}>
+            Cancelar edição
+          </button>
+        </div>
+      )}
 
       {costs.operadorPercent > 0 && (
         <div style={styles.operadorInfo}>
@@ -241,7 +285,6 @@ function AddDay({ onSave }: AddDayProps) {
             </div>
           )}
 
-          {/* Quilómetros */}
           <div style={styles.kmBox}>
             <p style={styles.kmTitle}>🗺️ Quilómetros</p>
             <div style={styles.kmGrid}>
@@ -268,7 +311,6 @@ function AddDay({ onSave }: AddDayProps) {
           <Input label="Horas trabalhadas" type="number" value={form.horas}
             onChange={(value) => setForm({ ...form, horas: value })} />
 
-          {/* Preview do lucro */}
           {ganhoCalculado > 0 && (
             <div style={styles.preview}>
               <p style={styles.previewTitle}>📊 Estimativa do dia</p>
@@ -315,7 +357,9 @@ function AddDay({ onSave }: AddDayProps) {
             </div>
           )}
 
-          <button style={styles.submitButton}>Salvar dia</button>
+          <button style={styles.submitButton}>
+            {isEditing ? 'Guardar alterações' : 'Salvar dia'}
+          </button>
         </form>
       </section>
     </div>
@@ -327,6 +371,8 @@ const styles: Styles = {
   eyebrow: { margin: 0, fontSize: '12px', fontWeight: 900, letterSpacing: '0.14em', color: '#6366f1', textTransform: 'uppercase' },
   title: { margin: '8px 0', fontSize: '42px', fontWeight: 900 },
   subtitle: { margin: 0, color: '#64748b' },
+  editBanner: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderRadius: '14px', background: '#eef2ff', border: '1px solid #c7d2fe', marginBottom: '16px', fontSize: '14px', fontWeight: 700, color: '#3730a3' },
+  editCancelBtn: { padding: '8px 14px', borderRadius: '10px', border: '1px solid #c7d2fe', background: '#ffffff', color: '#4f46e5', fontWeight: 800, cursor: 'pointer', fontSize: '13px' },
   operadorInfo: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderRadius: '14px', background: '#f0fdf4', border: '1px solid #86efac', marginBottom: '16px', fontSize: '14px', fontWeight: 700, color: '#15803d' },
   operadorSub: { fontSize: '12px', color: '#64748b', fontWeight: 600 },
   card: { maxWidth: '900px', padding: '28px', borderRadius: '28px', background: '#ffffff', border: '1px solid #e5e7eb', boxShadow: '0 22px 60px rgba(15,23,42,0.07)' },

@@ -5,6 +5,7 @@ import { Day } from '../types';
 interface HistoryProps {
   days: Day[];
   setDays: React.Dispatch<React.SetStateAction<Day[]>>;
+  onEdit: (day: Day) => void;
   isDemo?: boolean;
 }
 
@@ -17,7 +18,7 @@ interface DayCalc {
 type Styles = Record<string, CSSProperties>;
 
 // ── Componente ────────────────────────────────────────────────────────────────
-function History({ days, setDays }: HistoryProps) {
+function History({ days, setDays, onEdit }: HistoryProps) {
   function calcular(day: Day): DayCalc {
     let ganho = 0;
     if (Array.isArray(day.rides) && day.rides.length > 0) {
@@ -39,26 +40,35 @@ function History({ days, setDays }: HistoryProps) {
     setDays((prev) => prev.filter((day) => day.id !== id));
   }
 
+  // Ordena do mais recente para o mais antigo
+  const sortedDays = [...days].sort(
+    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+  );
+
   return (
     <div>
       <header style={styles.header}>
         <p style={styles.eyebrow}>Records</p>
         <h1 style={styles.title}>Histórico</h1>
-        <p style={styles.subtitle}>Consulte e remova registos anteriores.</p>
+        <p style={styles.subtitle}>Consulte, edite ou remova registos anteriores.</p>
       </header>
 
       <section style={styles.list}>
-        {days.length === 0 && (
+        {sortedDays.length === 0 && (
           <div style={styles.empty}>Ainda não existem registos.</div>
         )}
-        {days.map((day) => {
+        {sortedDays.map((day) => {
           const d = calcular(day);
+          const km = day.kmInicio && day.kmFim
+            ? Math.max(0, (Number(day.kmFim) || 0) - (Number(day.kmInicio) || 0))
+            : 0;
           return (
             <article key={day.id} style={styles.item}>
               <div>
                 <p style={styles.date}>{day.date}</p>
                 <p style={styles.meta}>
                   Modo: {day.mode === 'rides' ? 'Por corrida' : 'Total do dia'}
+                  {km > 0 && ` · ${km} km`}
                 </p>
               </div>
               <div style={styles.values}>
@@ -66,9 +76,14 @@ function History({ days, setDays }: HistoryProps) {
                 <span>Despesas: € {d.despesas.toFixed(2)}</span>
                 <strong>Lucro: € {d.lucro.toFixed(2)}</strong>
               </div>
-              <button onClick={() => removerDia(day.id)} style={styles.delete}>
-                Remover
-              </button>
+              <div style={styles.actions}>
+                <button onClick={() => onEdit(day)} style={styles.edit}>
+                  ✏️ Editar
+                </button>
+                <button onClick={() => removerDia(day.id)} style={styles.delete}>
+                  Remover
+                </button>
+              </div>
             </article>
           );
         })}
@@ -89,6 +104,8 @@ const styles: Styles = {
   date: { margin: 0, fontWeight: 900, color: '#0f172a' },
   meta: { margin: '6px 0 0', color: '#64748b', fontWeight: 700 },
   values: { display: 'flex', gap: '18px', flexWrap: 'wrap', color: '#475569', fontWeight: 800 },
+  actions: { display: 'flex', gap: '8px' },
+  edit: { border: '1px solid #c7d2fe', background: '#eef2ff', color: '#4f46e5', padding: '10px 14px', borderRadius: '12px', fontWeight: 900, cursor: 'pointer' },
   delete: { border: 'none', background: '#fee2e2', color: '#b91c1c', padding: '10px 14px', borderRadius: '12px', fontWeight: 900, cursor: 'pointer' },
 };
 
