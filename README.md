@@ -34,6 +34,13 @@ This dashboard solves that problem by turning raw daily data into **clear financ
 - Progress bar updated in real time as days are added
 - AI analysis tells you exactly how many more hours or days you need to hit your goal
 
+### 📅 Cash Flow — Expense Due-Date Tracking
+- Set a due day (1–31) for each fixed monthly/annual cost: instalment, insurance, road tax (IUC), oil, tires, maintenance, VAT
+- The dashboard automatically calculates how many days remain until each expense is due and how much to set aside per day to cover it
+- "Upcoming Expenses" card lists all due costs sorted by urgency
+- "Today's Goal" card combines the remaining weekly target (spread across the days left in the week) with the daily reserve needed for upcoming expenses
+- Expenses due within 14 days are automatically included in the weekly break-even analysis
+
 ### 🗺️ Kilometre Tracking
 - Log start and end km for each day
 - Total km, profit per km, and km per hour calculated automatically
@@ -65,6 +72,7 @@ Supports two real-world workflows:
 - Profit per hour and profit per km
 - Weekly trend with week-over-week delta
 - Break-even status with actionable recommendations
+- Daily revenue target combining weekly goal pacing with upcoming expense reserves
 
 ---
 
@@ -74,7 +82,7 @@ This project is built around a real constraint:
 
 > Drivers don't think daily — they think weekly (because they get paid weekly).
 
-That's why the dashboard focuses on **weekly analytics inside monthly views** — and shows whether fixed costs are being covered each week.
+That's why the dashboard focuses on **weekly analytics inside monthly views** — and shows whether fixed costs are being covered each week, including upcoming bills before they hit.
 
 ---
 
@@ -93,7 +101,6 @@ That's why the dashboard focuses on **weekly analytics inside monthly views** �
 ## 📸 Preview
 
 ### Dashboard Overview
-
 ![Dashboard Overview](preview.png)
 
 ---
