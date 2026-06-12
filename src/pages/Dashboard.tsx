@@ -51,8 +51,8 @@ interface BreakEvenColors {
   positivo: CSSProperties; negativo: CSSProperties; info: CSSProperties;
 }
 interface MesOpcao {
-  key: string; // 'YYYY-MM'
-  label: string; // 'Junho 2026'
+  key: string;
+  label: string;
 }
 
 type Styles = Record<string, CSSProperties>;
@@ -83,6 +83,11 @@ function getSemanaActual(days: Day[]): Day[] {
     const date = new Date(d.date);
     return date >= segunda && date <= domingo;
   });
+}
+
+function getDiaTrabalhadoHoje(days: Day[]): boolean {
+  const hojeStr = new Date().toISOString().split('T')[0];
+  return days.some((d) => d.date === hojeStr);
 }
 
 function calcularDia(day: Day): DayCalcSimple {
@@ -125,7 +130,6 @@ function calcular(day: Day): DayCalc {
   return { ganho, uber, bolt, gorjetas, combustivel, operador, despesas, lucro, horas: Number(day.horas) || 0, km };
 }
 
-// Gera label do mês em português
 function labelMes(ano: number, mes: number): string {
   const meses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
     'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
@@ -154,11 +158,10 @@ function MiniCard({ title, value, color, isMobile }: MiniCardProps) {
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 function Dashboard({ days, isDemo }: DashboardProps) {
-  const { costs } = useContext(AppContext);
+  const { costs, calcularVencimentos } = useContext(AppContext);
   const [insight, setInsight] = useState<string>('');
   const isMobile = useIsMobile();
 
-  // Objetivo semanal
   const [objetivoSemanal, setObjetivoSemanal] = useState<number>(() => {
     const saved = localStorage.getItem('driver-objetivo-semanal');
     return saved ? Number(saved) : 0;
@@ -176,8 +179,6 @@ function Dashboard({ days, isDemo }: DashboardProps) {
     setObjetivoInput('');
   }
 
-  // ── Navegação por mês ─────────────────────────────────────────────────────
-  // Extrai todos os meses com dados, ordenados do mais recente para o mais antigo
   const mesesDisponiveis = useMemo((): MesOpcao[] => {
     const set = new Set<string>();
     days.forEach((d) => {
@@ -186,7 +187,6 @@ function Dashboard({ days, isDemo }: DashboardProps) {
       const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
       set.add(key);
     });
-    // Adiciona sempre o mês actual mesmo sem dados
     const hoje = new Date();
     const keyHoje = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
     set.add(keyHoje);
@@ -199,13 +199,11 @@ function Dashboard({ days, isDemo }: DashboardProps) {
       });
   }, [days]);
 
-  // Mês seleccionado — por defeito o mês actual
   const [mesSelecionado, setMesSelecionado] = useState<string>(() => {
     const hoje = new Date();
     return `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
   });
 
-  // Dias filtrados pelo mês seleccionado
   const filteredDays = useMemo(() => {
     return days
       .filter((day) => {
@@ -217,7 +215,6 @@ function Dashboard({ days, isDemo }: DashboardProps) {
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [days, mesSelecionado]);
 
-  // ── Semana actual ─────────────────────────────────────────────────────────
   const custoSemanal = calcularCustoSemanal(costs);
   const diasSemanaActual = useMemo(() => getSemanaActual(days), [days]);
   const semanaActual = useMemo(() => {
@@ -236,9 +233,24 @@ function Dashboard({ days, isDemo }: DashboardProps) {
   const temDadosSemana = diasSemanaActual.length > 0;
   const mediaHoraSemana = semanaActual.horas > 0 ? semanaActual.lucro / semanaActual.horas : 0;
   const hojeIndex = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1;
-  const diasRestantes = 6 - hojeIndex;
+  const diasRestantes = 6 - hojeIndex; // incluindo hoje
+  const trabalhouHoje = useMemo(() => getDiaTrabalhadoHoje(days), [days]);
 
-  // ── Totais do mês seleccionado ────────────────────────────────────────────
+  // ── Vencimentos / Próximas despesas ───────────────────────────────────────
+  const vencimentos = useMemo(() => calcularVencimentos(costs), [costs, calcularVencimentos]);
+  const vencimentosUrgentes = vencimentos.filter((v) => v.diasRestantes <= 14);
+  const totalVencimentosPorDia = vencimentos.reduce((acc, v) => acc + v.valorPorDia, 0);
+
+  // ── Meta de Hoje ──────────────────────────────────────────────────────────
+  const metaHoje = useMemo(() => {
+    if (objetivoSemanal <= 0) return null;
+    const faltaObjetivo = Math.max(0, objetivoSemanal - semanaActual.ganho);
+    const diasParaDistribuir = Math.max(1, diasRestantes);
+    const metaBase = faltaObjetivo / diasParaDistribuir;
+    const metaComVencimentos = metaBase + totalVencimentosPorDia;
+    return { faltaObjetivo, metaBase, metaComVencimentos, diasParaDistribuir };
+  }, [objetivoSemanal, semanaActual.ganho, diasRestantes, totalVencimentosPorDia]);
+
   const totals = filteredDays.reduce(
     (acc, day) => {
       const d = calcular(day);
@@ -252,7 +264,6 @@ function Dashboard({ days, isDemo }: DashboardProps) {
   );
   const mediaHora = totals.horas > 0 ? totals.lucro / totals.horas : 0;
 
-  // ── Semanas do mês seleccionado ───────────────────────────────────────────
   const weeklyData = useMemo((): WeekData[] => {
     const weeks: WeekAccumulator = {};
     filteredDays.forEach((day) => {
@@ -280,7 +291,6 @@ function Dashboard({ days, isDemo }: DashboardProps) {
       });
   }, [filteredDays, isMobile]);
 
-  // ── Análise anual — totais por mês ────────────────────────────────────────
   const analiseAnual = useMemo(() => {
     const meses: { label: string; ganho: number; lucro: number; dias: number }[] = [];
     const map: { [key: string]: { ganho: number; lucro: number; dias: number } } = {};
@@ -303,33 +313,23 @@ function Dashboard({ days, isDemo }: DashboardProps) {
     return meses;
   }, [days]);
 
-  // ── Análise Break-Even ────────────────────────────────────────────────────
   function gerarAnaliseBreakEven(): BreakEvenAnalysis | null {
-    if (!temCustos && objetivoSemanal === 0) return null;
+    if (!temCustos && objetivoSemanal === 0 && vencimentos.length === 0) return null;
     const linhas: string[] = [];
-    if (objetivoSemanal > 0 && temDadosSemana) {
-      const faltaObjetivo = objetivoSemanal - semanaActual.ganho;
-      const progressoPercent = Math.round((semanaActual.ganho / objetivoSemanal) * 100);
-      if (faltaObjetivo <= 0) {
-        linhas.push(`🎯 Objetivo semanal atingido! Faturaste €${semanaActual.ganho.toFixed(2)} de €${objetivoSemanal.toFixed(2)} (${progressoPercent}%).`);
+
+    if (metaHoje && metaHoje.faltaObjetivo > 0) {
+      if (trabalhouHoje) {
+        linhas.push(`🎯 Meta semanal: faltam €${metaHoje.faltaObjetivo.toFixed(2)} · distribuído pelos ${metaHoje.diasParaDistribuir} dia(s) restantes ≈ €${metaHoje.metaBase.toFixed(2)}/dia.`);
       } else {
-        linhas.push(`🎯 Objetivo: €${objetivoSemanal.toFixed(2)} · Atual: €${semanaActual.ganho.toFixed(2)} · Falta: €${faltaObjetivo.toFixed(2)} (${progressoPercent}%)`);
-        if (diasRestantes > 0 && semanaActual.horas > 0) {
-          const ganhoMediaDia = semanaActual.ganho / diasSemanaActual.length;
-          const diasNecessarios = Math.ceil(faltaObjetivo / ganhoMediaDia);
-          const mediaGanhoHora = semanaActual.ganho / semanaActual.horas;
-          const horasNecessarias = mediaGanhoHora > 0 ? Math.ceil(faltaObjetivo / mediaGanhoHora) : 0;
-          if (diasNecessarios <= diasRestantes) {
-            linhas.push(`📅 Ao teu ritmo (€${ganhoMediaDia.toFixed(2)}/dia), precisas de mais ${diasNecessarios} dia${diasNecessarios > 1 ? 's' : ''} para atingir o objetivo.`);
-          } else {
-            linhas.push(`⚠️ Ao ritmo actual não consegues atingir o objetivo esta semana. Aumenta as horas nos dias restantes.`);
-          }
-          if (horasNecessarias > 0) linhas.push(`⏱ Precisas de mais ${horasNecessarias}h a €${mediaGanhoHora.toFixed(2)}/h para atingir o objetivo.`);
-        }
+        const metaTexto = totalVencimentosPorDia > 0
+          ? `€${metaHoje.metaComVencimentos.toFixed(2)} (inclui €${totalVencimentosPorDia.toFixed(2)} para despesas a vencer)`
+          : `€${metaHoje.metaBase.toFixed(2)}`;
+        linhas.push(`🎯 Meta de hoje: ${metaTexto} para manter o objetivo semanal de €${objetivoSemanal.toFixed(2)} no caminho certo.`);
       }
-    } else if (objetivoSemanal > 0 && !temDadosSemana) {
-      linhas.push(`🎯 Objetivo desta semana: €${objetivoSemanal.toFixed(2)}. Adiciona o primeiro dia para acompanhar o progresso.`);
+    } else if (objetivoSemanal > 0 && metaHoje && metaHoje.faltaObjetivo <= 0) {
+      linhas.push(`🎉 Objetivo semanal já atingido! Faturaste €${semanaActual.ganho.toFixed(2)} de €${objetivoSemanal.toFixed(2)}.`);
     }
+
     if (temCustos && temDadosSemana) {
       if (margem >= 0) {
         const percentagem = Math.round((semanaActual.lucro / custoSemanal) * 100);
@@ -346,19 +346,24 @@ function Dashboard({ days, isDemo }: DashboardProps) {
     } else if (temCustos && !temDadosSemana) {
       linhas.push(`📋 Custos fixos semanais: €${custoSemanal.toFixed(2)}. Adiciona dias para ver a análise.`);
     }
+
+    vencimentosUrgentes.forEach((v) => {
+      linhas.push(`📅 ${v.label}: €${v.valor.toFixed(2)} vence dia ${v.vence} (${v.diasRestantes} dia${v.diasRestantes !== 1 ? 's' : ''}) · reserva €${v.valorPorDia.toFixed(2)}/dia.`);
+    });
+
     if (semanaActual.km > 0) {
       const lucroKm = semanaActual.lucro / semanaActual.km;
       linhas.push(`🗺️ ${semanaActual.km} km esta semana · €${lucroKm.toFixed(2)}/km de lucro.`);
     }
+
     if (linhas.length === 0) return null;
-    const tipo = margem >= 0 && (objetivoSemanal === 0 || semanaActual.ganho >= objetivoSemanal)
+    const tipo = margem >= 0 && (objetivoSemanal === 0 || semanaActual.ganho >= objetivoSemanal) && vencimentosUrgentes.length === 0
       ? 'positivo' : linhas.some(l => l.includes('🚨')) ? 'negativo' : 'info';
     return { tipo, linhas };
   }
 
   const analiseBreakEven = gerarAnaliseBreakEven();
 
-  // ── Charts ────────────────────────────────────────────────────────────────
   const trendChartData = {
     labels: weeklyData.map((w) => w.label),
     datasets: [
@@ -403,9 +408,8 @@ function Dashboard({ days, isDemo }: DashboardProps) {
     },
   };
 
-  // Gráfico anual
   const anualChartData = {
-    labels: analiseAnual.map((m) => m.label.split(' ')[0]), // só o nome do mês
+    labels: analiseAnual.map((m) => m.label.split(' ')[0]),
     datasets: [
       { label: 'Ganho', data: analiseAnual.map((m) => parseFloat(m.ganho.toFixed(2))), backgroundColor: '#22c55e', borderRadius: 6 },
       { label: 'Lucro', data: analiseAnual.map((m) => parseFloat(m.lucro.toFixed(2))), backgroundColor: '#8b5cf6', borderRadius: 6 },
@@ -421,6 +425,7 @@ function Dashboard({ days, isDemo }: DashboardProps) {
     texto += `Despesas: €${totals.despesas.toFixed(2)} · €/h: €${mediaHora.toFixed(2)}\n`;
     if (totals.km > 0) texto += `Km: ${totals.km} · Lucro/km: €${(totals.lucro / totals.km).toFixed(2)}\n`;
     if (objetivoSemanal > 0) texto += `Objetivo semanal: €${objetivoSemanal.toFixed(2)}\n`;
+    if (totalVencimentosPorDia > 0) texto += `Despesas a vencer: €${totalVencimentosPorDia.toFixed(2)}/dia reservado\n`;
     texto += '\n';
     if (totals.lucro < 0) {
       texto += '🚨 Mês negativo. Prioridade: rever combustível, operador e horários.\n\n';
@@ -440,6 +445,12 @@ function Dashboard({ days, isDemo }: DashboardProps) {
     }
     if (totals.uber > totals.bolt) texto += '💡 Uber teve melhor desempenho que Bolt.\n';
     else if (totals.bolt > totals.uber) texto += '💡 Bolt teve melhor desempenho que Uber.\n';
+    if (vencimentosUrgentes.length > 0) {
+      texto += '\n📅 Despesas a vencer em breve:\n';
+      vencimentosUrgentes.forEach((v) => {
+        texto += `  • ${v.label}: €${v.valor.toFixed(2)} no dia ${v.vence} (${v.diasRestantes}d) → €${v.valorPorDia.toFixed(2)}/dia\n`;
+      });
+    }
     texto += '\n👉 Compara os dias com maior lucro e identifica horário, plataforma e custo de combustível.';
     return texto;
   }
@@ -455,7 +466,6 @@ function Dashboard({ days, isDemo }: DashboardProps) {
 
   return (
     <div>
-      {/* Header */}
       <header style={s.header}>
         <div style={{ flex: 1 }}>
           <p style={s.eyebrow}>Performance Overview</p>
@@ -467,7 +477,6 @@ function Dashboard({ days, isDemo }: DashboardProps) {
         </button>
       </header>
 
-      {/* Objetivo Semanal */}
       <section style={s.objetivoCard}>
         <div style={s.objetivoHeader}>
           <div>
@@ -502,7 +511,17 @@ function Dashboard({ days, isDemo }: DashboardProps) {
         )}
       </section>
 
-      {/* Análise semana */}
+      {metaHoje && metaHoje.faltaObjetivo > 0 && (
+        <section style={s.metaHojeCard}>
+          <p style={s.metaHojeLabel}>🎯 Meta de Hoje</p>
+          <p style={s.metaHojeValor}>€{metaHoje.metaComVencimentos.toFixed(2)}</p>
+          <p style={s.metaHojeDetalhe}>
+            €{metaHoje.metaBase.toFixed(2)} para o objetivo semanal
+            {totalVencimentosPorDia > 0 && ` + €${totalVencimentosPorDia.toFixed(2)} para despesas a vencer`}
+          </p>
+        </section>
+      )}
+
       {analiseBreakEven && (
         <section style={{ ...s.breakEvenBox, ...breakEvenColors[analiseBreakEven.tipo] }}>
           <p style={s.breakEvenTitulo}>
@@ -513,7 +532,32 @@ function Dashboard({ days, isDemo }: DashboardProps) {
         </section>
       )}
 
-      {/* ── Selector de Mês ── */}
+      {vencimentos.length > 0 && (
+        <section style={s.vencimentosCard}>
+          <div style={s.chartHeader}>
+            <div>
+              <p style={s.eyebrow}>Cash Flow</p>
+              <h2 style={s.sectionTitle}>Próximas Despesas</h2>
+            </div>
+            <span style={s.badge}>{vencimentos.length}</span>
+          </div>
+          <div style={s.vencimentosList}>
+            {vencimentos.map((v) => (
+              <div key={v.key} style={s.vencimentoItem}>
+                <div>
+                  <p style={s.vencimentoNome}>{v.label}</p>
+                  <p style={s.vencimentoMeta}>Vence dia {v.vence} · {v.diasRestantes} dia{v.diasRestantes !== 1 ? 's' : ''}</p>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <p style={s.vencimentoValor}>€{v.valor.toFixed(2)}</p>
+                  <p style={s.vencimentoPorDia}>€{v.valorPorDia.toFixed(2)}/dia</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       <section style={s.mesNav}>
         <div style={s.mesNavHeader}>
           <p style={s.mesNavLabel}>📅 A ver:</p>
@@ -529,7 +573,6 @@ function Dashboard({ days, isDemo }: DashboardProps) {
         </div>
       </section>
 
-      {/* KPIs do mês */}
       <section style={s.kpiGrid}>
         <KpiCard title="Lucro Total" value={totals.lucro} color="#16a34a" featured isMobile={isMobile} />
         <KpiCard title="Ganho Total" value={totals.ganho} color="#2563eb" isMobile={isMobile} />
@@ -557,7 +600,6 @@ function Dashboard({ days, isDemo }: DashboardProps) {
 
       {insight && <section style={s.insightBox}>{insight}</section>}
 
-      {/* Semanas do mês */}
       {weeklyData.length > 0 && (
         <section style={s.chartCard}>
           <div style={s.chartHeader}>
@@ -593,7 +635,6 @@ function Dashboard({ days, isDemo }: DashboardProps) {
         </section>
       )}
 
-      {/* Breakdown diário do mês */}
       {(!isMobile || filteredDays.length <= 14) && filteredDays.length > 0 && (
         <section style={{ ...s.chartCard, marginTop: '16px' }}>
           <div style={s.chartHeader}>
@@ -618,7 +659,6 @@ function Dashboard({ days, isDemo }: DashboardProps) {
         </section>
       )}
 
-      {/* Visão Anual */}
       {analiseAnual.length >= 2 && (
         <section style={{ ...s.chartCard, marginTop: '16px' }}>
           <div style={s.chartHeader}>
@@ -631,7 +671,7 @@ function Dashboard({ days, isDemo }: DashboardProps) {
           <div style={s.weekGrid}>
             {analiseAnual.map((m, i) => (
               <div key={i}
-                style={{ ...s.weekCard, cursor: 'pointer', ...(mesesDisponiveis.find(opt => opt.label === m.label) ? {} : {}) }}
+                style={{ ...s.weekCard, cursor: 'pointer' }}
                 onClick={() => {
                   const opt = mesesDisponiveis.find(opt => opt.label === m.label);
                   if (opt) { setMesSelecionado(opt.key); window.scrollTo({ top: 0, behavior: 'smooth' }); }
@@ -672,10 +712,21 @@ const desktopStyles: Styles = {
   progressoBar: { height: '8px', borderRadius: '999px', background: '#e2e8f0', overflow: 'hidden', marginBottom: '6px' },
   progressoFill: { height: '100%', borderRadius: '999px', transition: 'width 0.4s ease' },
   progressoInfo: { display: 'flex', justifyContent: 'space-between' },
+  metaHojeCard: { padding: '20px 24px', borderRadius: '20px', background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', marginBottom: '16px', boxShadow: '0 14px 34px rgba(79,70,229,0.25)' },
+  metaHojeLabel: { margin: '0 0 6px', fontSize: '13px', fontWeight: 800, color: 'rgba(255,255,255,0.85)' },
+  metaHojeValor: { margin: 0, fontSize: '36px', fontWeight: 900, color: '#ffffff', letterSpacing: '-0.03em' },
+  metaHojeDetalhe: { margin: '8px 0 0', fontSize: '13px', color: 'rgba(255,255,255,0.85)', fontWeight: 600 },
   breakEvenBox: { padding: '20px 24px', borderRadius: '20px', marginBottom: '20px' },
   breakEvenTitulo: { margin: '0 0 10px', fontWeight: 900, fontSize: '15px', color: '#0f172a' },
   breakEvenCusto: { fontSize: '13px', fontWeight: 700, color: '#64748b' },
   breakEvenLinha: { margin: '4px 0 0', fontSize: '14px', lineHeight: 1.7, color: '#1e293b', fontWeight: 600 },
+  vencimentosCard: { padding: '24px', borderRadius: '24px', background: '#fffbeb', border: '1px solid #fde68a', boxShadow: '0 8px 30px rgba(15,23,42,0.05)', marginBottom: '20px' },
+  vencimentosList: { display: 'grid', gap: '10px', marginTop: '4px' },
+  vencimentoItem: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', borderRadius: '14px', background: '#ffffff', border: '1px solid #fde68a' },
+  vencimentoNome: { margin: 0, fontWeight: 900, fontSize: '14px', color: '#0f172a' },
+  vencimentoMeta: { margin: '4px 0 0', fontSize: '12px', color: '#92400e', fontWeight: 700 },
+  vencimentoValor: { margin: 0, fontWeight: 900, fontSize: '16px', color: '#0f172a' },
+  vencimentoPorDia: { margin: '4px 0 0', fontSize: '12px', color: '#b45309', fontWeight: 700 },
   mesNav: { marginBottom: '20px' },
   mesNavHeader: { display: 'flex', alignItems: 'center', gap: '12px' },
   mesNavLabel: { margin: 0, fontSize: '14px', fontWeight: 800, color: '#475569' },
@@ -714,9 +765,13 @@ const mobileStyles: Styles = {
   aiButton: { padding: '10px 12px', borderRadius: '12px', border: 'none', background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', color: '#fff', fontWeight: 900, cursor: 'pointer', fontSize: '13px', whiteSpace: 'nowrap', flexShrink: 0 },
   objetivoCard: { padding: '16px', borderRadius: '18px', background: '#ffffff', border: '1px solid #e5e7eb', marginBottom: '12px' },
   objetivoValor: { margin: 0, fontSize: '22px', fontWeight: 900, color: '#0f172a' },
+  metaHojeCard: { padding: '16px', borderRadius: '18px', background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', marginBottom: '12px' },
+  metaHojeValor: { margin: 0, fontSize: '28px', fontWeight: 900, color: '#ffffff', letterSpacing: '-0.02em' },
   breakEvenBox: { padding: '16px', borderRadius: '18px', marginBottom: '16px' },
   breakEvenTitulo: { margin: '0 0 8px', fontWeight: 900, fontSize: '14px', color: '#0f172a' },
   breakEvenLinha: { margin: '4px 0 0', fontSize: '13px', lineHeight: 1.6, color: '#1e293b', fontWeight: 600 },
+  vencimentosCard: { padding: '18px', borderRadius: '20px', background: '#fffbeb', border: '1px solid #fde68a', marginBottom: '16px' },
+  vencimentoItem: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', borderRadius: '12px', background: '#ffffff', border: '1px solid #fde68a', gap: '10px' },
   mesNav: { marginBottom: '16px' },
   mesSelect: { padding: '9px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#ffffff', fontSize: '14px', fontWeight: 800, color: '#0f172a', cursor: 'pointer', outline: 'none', width: '100%' },
   mesNavHeader: { display: 'flex', flexDirection: 'column', gap: '8px' },

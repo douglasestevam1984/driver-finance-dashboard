@@ -34,4 +34,7 @@ export interface Costs {
   alimentacao: number;
   iva: number;
   outros: number;
+  // Dia do mês (1-31) em que cada despesa vence. Apenas para despesas
+  // mensais/anuais — usado para a análise de tesouraria no Dashboard.
+  vencimentos?: Partial<Record<string, number>>;
 }

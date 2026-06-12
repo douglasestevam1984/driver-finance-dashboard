@@ -1,5 +1,5 @@
 import { useContext, useState, useEffect, CSSProperties, ChangeEvent } from 'react';
-import { AppContext, calcularCustoSemanal, calcularCustosVariaveisDias } from '../context/AppContext';
+import { AppContext, calcularCustoSemanal, calcularCustosVariaveisDias, camposComVencimento } from '../context/AppContext';
 import { Day, Costs as CostsType } from '../types';
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
@@ -55,6 +55,9 @@ function getSemanaActual(days: Day[]): Day[] {
   });
 }
 
+// Conjunto de keys que têm campo de vencimento
+const keysComVencimento = new Set(camposComVencimento.map((c) => c.key));
+
 // ── Categorias ────────────────────────────────────────────────────────────────
 const categorias: Categoria[] = [
   {
@@ -98,7 +101,7 @@ const categorias: Categoria[] = [
 
 // ── Componente ────────────────────────────────────────────────────────────────
 export default function Costs() {
-  const { costs, updateCosts, days } = useContext(AppContext);
+  const { costs, updateCosts, days, calcularVencimentos } = useContext(AppContext);
   const [form, setForm] = useState<CostsType>(costs);
   const [saved, setSaved] = useState(false);
   const isMobile = useIsMobile();
@@ -123,8 +126,19 @@ export default function Costs() {
   const margem: number | null = diasSemana.length > 0 ? lucroSemana - custoTotalSemanal : null;
   const temDadosSemana = diasSemana.length > 0;
 
+  const vencimentos = calcularVencimentos(form);
+
   function handleChange(key: keyof CostsType, value: string): void {
     setForm((prev) => ({ ...prev, [key]: value }));
+    setSaved(false);
+  }
+
+  function handleVencimentoChange(key: keyof CostsType, value: string): void {
+    const dia = value === '' ? undefined : Math.min(31, Math.max(1, Number(value) || 0));
+    setForm((prev) => ({
+      ...prev,
+      vencimentos: { ...(prev.vencimentos ?? {}), [key as string]: dia },
+    }));
     setSaved(false);
   }
 
@@ -227,30 +241,71 @@ export default function Costs() {
         </section>
       )}
 
+      {/* ── Próximos Vencimentos ── */}
+      {vencimentos.length > 0 && (
+        <section style={s.vencimentosCard}>
+          <h2 style={s.catTitulo}>📅 Próximos Vencimentos</h2>
+          <div style={s.vencimentosList}>
+            {vencimentos.map((v) => (
+              <div key={v.key} style={s.vencimentoItem}>
+                <div>
+                  <p style={s.vencimentoLabel}>{v.label}</p>
+                  <p style={s.vencimentoMeta}>Vence dia {v.vence} · {v.diasRestantes} dia{v.diasRestantes !== 1 ? 's' : ''}</p>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <p style={s.vencimentoValor}>€{v.valor.toFixed(2)}</p>
+                  <p style={s.vencimentoPorDia}>€{v.valorPorDia.toFixed(2)}/dia para reservar</p>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p style={s.vencimentoNota}>
+            💡 Estes valores são adicionais aos custos fixos semanais já contabilizados acima. A análise diária no Dashboard usa estes dados.
+          </p>
+        </section>
+      )}
+
       {categorias.map((cat) => (
         <section key={cat.titulo} style={s.card}>
           <h2 style={s.catTitulo}>{cat.titulo}</h2>
           <div style={s.camposGrid}>
             {cat.campos.map((campo) => (
-              <label key={campo.key} style={s.label}>
-                <span style={s.labelText}>
-                  {campo.label}
-                  <span style={s.periodo}> ({campo.periodo})</span>
-                </span>
-                <div style={s.inputWrapper}>
-                  <span style={s.euro}>{campo.isPercent ? '%' : '€'}</span>
-                  <input
-                    type="number"
-                    min="0"
-                    max={campo.isPercent ? '100' : undefined}
-                    step={campo.isPercent ? '0.1' : '0.01'}
-                    value={String(form[campo.key] ?? '')}
-                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange(campo.key, e.target.value)}
-                    style={s.input}
-                    placeholder={campo.isPercent ? '0' : '0.00'}
-                  />
-                </div>
-              </label>
+              <div key={campo.key} style={s.campoBlock}>
+                <label style={s.label}>
+                  <span style={s.labelText}>
+                    {campo.label}
+                    <span style={s.periodo}> ({campo.periodo})</span>
+                  </span>
+                  <div style={s.inputWrapper}>
+                    <span style={s.euro}>{campo.isPercent ? '%' : '€'}</span>
+                    <input
+                      type="number"
+                      min="0"
+                      max={campo.isPercent ? '100' : undefined}
+                      step={campo.isPercent ? '0.1' : '0.01'}
+                      value={String(form[campo.key] ?? '')}
+                      onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange(campo.key, e.target.value)}
+                      style={s.input}
+                      placeholder={campo.isPercent ? '0' : '0.00'}
+                    />
+                  </div>
+                </label>
+
+                {keysComVencimento.has(campo.key) && Number(form[campo.key]) > 0 && (
+                  <label style={s.vencimentoLabel2}>
+                    <span style={s.vencimentoLabelText}>📅 Dia de vencimento</span>
+                    <input
+                      type="number"
+                      min="1"
+                      max="31"
+                      value={form.vencimentos?.[campo.key as string] ?? ''}
+                      onChange={(e: ChangeEvent<HTMLInputElement>) => handleVencimentoChange(campo.key, e.target.value)}
+                      style={s.vencimentoInput}
+                      placeholder="Ex: 10"
+                    />
+                  </label>
+                )}
+              </div>
             ))}
           </div>
           {cat.titulo.includes('Operador') && (
@@ -296,15 +351,27 @@ const desktopStyles: Styles = {
   analiseBox: { padding: '20px 24px', borderRadius: '20px', border: '1px solid', marginBottom: '20px' },
   analiseEmoji: { margin: '0 0 8px', fontWeight: 900, fontSize: '14px', color: '#0f172a' },
   analiseTexto: { margin: 0, fontSize: '15px', lineHeight: 1.7, color: '#1e293b', fontWeight: 600 },
+  vencimentosCard: { padding: '24px', borderRadius: '24px', background: '#fffbeb', border: '1px solid #fde68a', boxShadow: '0 8px 30px rgba(15,23,42,0.05)', marginBottom: '20px' },
+  vencimentosList: { display: 'grid', gap: '10px', marginTop: '16px' },
+  vencimentoItem: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', borderRadius: '14px', background: '#ffffff', border: '1px solid #fde68a' },
+  vencimentoLabel: { margin: 0, fontWeight: 900, fontSize: '14px', color: '#0f172a' },
+  vencimentoMeta: { margin: '4px 0 0', fontSize: '12px', color: '#92400e', fontWeight: 700 },
+  vencimentoValor: { margin: 0, fontWeight: 900, fontSize: '16px', color: '#0f172a' },
+  vencimentoPorDia: { margin: '4px 0 0', fontSize: '12px', color: '#b45309', fontWeight: 700 },
+  vencimentoNota: { margin: '16px 0 0', fontSize: '13px', color: '#92400e', fontWeight: 600, lineHeight: 1.6 },
   card: { padding: '24px', borderRadius: '24px', background: '#ffffff', border: '1px solid #e5e7eb', boxShadow: '0 8px 30px rgba(15,23,42,0.05)', marginBottom: '16px' },
   catTitulo: { margin: '0 0 20px', fontSize: '18px', fontWeight: 900 },
   camposGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' },
+  campoBlock: { display: 'flex', flexDirection: 'column', gap: '10px' },
   label: { display: 'flex', flexDirection: 'column', gap: '8px' },
   labelText: { fontSize: '14px', fontWeight: 800, color: '#475569' },
   periodo: { fontSize: '12px', fontWeight: 600, color: '#94a3b8' },
   inputWrapper: { display: 'flex', alignItems: 'center', border: '1px solid #cbd5e1', borderRadius: '14px', overflow: 'hidden', background: '#ffffff' },
   euro: { padding: '12px 14px', background: '#f8fafc', color: '#64748b', fontWeight: 800, fontSize: '15px', borderRight: '1px solid #e2e8f0' },
   input: { flex: 1, padding: '12px 14px', border: 'none', outline: 'none', fontSize: '15px', background: 'transparent' },
+  vencimentoLabel2: { display: 'flex', flexDirection: 'column', gap: '6px' },
+  vencimentoLabelText: { fontSize: '12px', fontWeight: 800, color: '#92400e' },
+  vencimentoInput: { padding: '10px 12px', borderRadius: '12px', border: '1px solid #fde68a', background: '#fffbeb', fontSize: '14px', outline: 'none', width: '100px' },
   nota: { margin: '16px 0 0', fontSize: '13px', color: '#64748b', fontWeight: 600, lineHeight: 1.6 },
   notaBox: { padding: '16px 20px', borderRadius: '16px', background: '#fff7ed', border: '1px solid #fed7aa', marginBottom: '16px' },
   notaTexto: { margin: 0, fontSize: '14px', color: '#9a3412', fontWeight: 600, lineHeight: 1.6 },
@@ -317,6 +384,8 @@ const mobileStyles: Styles = {
   summaryGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' },
   summaryCard: { padding: '14px 16px', borderRadius: '16px', background: '#ffffff', border: '1px solid #e5e7eb' },
   summaryValue: { margin: 0, fontSize: '20px', fontWeight: 900 },
+  vencimentosCard: { padding: '18px', borderRadius: '20px', background: '#fffbeb', border: '1px solid #fde68a', marginBottom: '16px' },
+  vencimentoItem: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', borderRadius: '12px', background: '#ffffff', border: '1px solid #fde68a', gap: '10px' },
   card: { padding: '18px', borderRadius: '20px', background: '#ffffff', border: '1px solid #e5e7eb', marginBottom: '12px' },
   camposGrid: { display: 'grid', gridTemplateColumns: '1fr', gap: '14px' },
   analiseBox: { padding: '16px', borderRadius: '18px', border: '1px solid', marginBottom: '16px' },
